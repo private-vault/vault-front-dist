@@ -1,0 +1,21 @@
+{
+  "name": "Vault",
+  "keywords": [
+    "Vault",
+    "Password",
+    "Secret management",
+    "Github"
+  ],
+  "author": "Private Vault",
+  "licenses": [
+    {
+      "type": "Apache 2.0",
+      "url": "https://github.com/private-vault/vault/blob/master/LICENSE.txt"
+    }
+  ],
+  "devDependencies": {
+    "bluebird": "^2.6.4",
+    "del": "^1.1.1",
+    "ncp": "^1.0.1"
+  }
+}

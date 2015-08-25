@@ -215,6 +215,74 @@
 (function() {
     angular
         .module('xApp')
+        .factory('Api', apiFactory);
+
+    function apiFactory($resource) {
+        return {
+            auth: $resource("/internal/auth"),
+            project: $resource("/api/project/:id", null, enableCustom),
+            projectKeys: $resource("/api/project/keys/:id"),
+            projectOwner: $resource("/api/project/changeOwner/:id", null, enableCustom),
+            assignedTeams: $resource("/api/project/teams/:id", null, enableCustom),
+            user: $resource("/api/user/:id", null, enableCustom),
+            apis: $resource("/api/apis/:id", null, enableCustom),
+            team: $resource("/api/team/:id", null, enableCustom),
+            teamMembers: $resource("/api/teamMembers/:id", null, enableCustom),
+            projectTeams: $resource("/api/projectTeams/:id", null, enableCustom),
+            entryTeams: $resource("/api/entryTeams/:id", null, enableCustom),
+            entryTags: $resource("/api/entryTags/:id", null, enableCustom),
+            authStatus: $resource("/internal/auth/status", null),
+            profile: $resource("/api/profile", null, enableCustom),
+            share: $resource("/api/share/:id", null, enableCustom),
+            entry: $resource("/api/entry/:id", null, angular.extend(enableCustom, {
+                password: { method: 'GET', params: {id: '@id'} }
+            })),
+            entryAccess: $resource("/api/entry/access/:id", null),
+            entryPassword: $resource("/api/entry/password/:id", {}, {
+                password: { method: 'GET', params: {id: '@id'} }
+            })
+        }
+    }
+
+    var enableCustom = {
+        update: {
+            method: 'PUT', params: {id: '@id'}
+        },
+        delete: {
+            method: 'DELETE', params: {id: '@id'}
+        }
+    };
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ApiController', ctrl);
+
+    function ctrl($scope, Api, apis) {
+        $scope.apis = apis;
+        $scope.revoke = revoke;
+
+        $scope.$on('key:create', onKeyCreate);
+
+        function revoke(api) {
+            if (!confirm('Are you sure?')) {
+                return;
+            }
+
+            Api.apis.remove({id: api.id});
+            $scope.apis.splice($scope.apis.map(function(x) { return x.id; }).indexOf(api.id), 1);
+        }
+
+        function onKeyCreate(e, key) {
+            $scope.apis.push(key);
+        }
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
         .controller('AuthController', authController);
 
     function authController($scope, AuthFactory) {
@@ -360,74 +428,6 @@
     }
 
 })();
-(function() {
-    angular
-        .module('xApp')
-        .factory('Api', apiFactory);
-
-    function apiFactory($resource) {
-        return {
-            auth: $resource("/internal/auth"),
-            project: $resource("/api/project/:id", null, enableCustom),
-            projectKeys: $resource("/api/project/keys/:id"),
-            projectOwner: $resource("/api/project/changeOwner/:id", null, enableCustom),
-            assignedTeams: $resource("/api/project/teams/:id", null, enableCustom),
-            user: $resource("/api/user/:id", null, enableCustom),
-            apis: $resource("/api/apis/:id", null, enableCustom),
-            team: $resource("/api/team/:id", null, enableCustom),
-            teamMembers: $resource("/api/teamMembers/:id", null, enableCustom),
-            projectTeams: $resource("/api/projectTeams/:id", null, enableCustom),
-            entryTeams: $resource("/api/entryTeams/:id", null, enableCustom),
-            entryTags: $resource("/api/entryTags/:id", null, enableCustom),
-            authStatus: $resource("/internal/auth/status", null),
-            profile: $resource("/api/profile", null, enableCustom),
-            share: $resource("/api/share/:id", null, enableCustom),
-            entry: $resource("/api/entry/:id", null, angular.extend(enableCustom, {
-                password: { method: 'GET', params: {id: '@id'} }
-            })),
-            entryAccess: $resource("/api/entry/access/:id", null),
-            entryPassword: $resource("/api/entry/password/:id", {}, {
-                password: { method: 'GET', params: {id: '@id'} }
-            })
-        }
-    }
-
-    var enableCustom = {
-        update: {
-            method: 'PUT', params: {id: '@id'}
-        },
-        delete: {
-            method: 'DELETE', params: {id: '@id'}
-        }
-    };
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ApiController', ctrl);
-
-    function ctrl($scope, Api, apis) {
-        $scope.apis = apis;
-        $scope.revoke = revoke;
-
-        $scope.$on('key:create', onKeyCreate);
-
-        function revoke(api) {
-            if (!confirm('Are you sure?')) {
-                return;
-            }
-
-            Api.apis.remove({id: api.id});
-            $scope.apis.splice($scope.apis.map(function(x) { return x.id; }).indexOf(api.id), 1);
-        }
-
-        function onKeyCreate(e, key) {
-            $scope.apis.push(key);
-        }
-    }
-})();
-
 (function () {
     angular
         .module('xApp')
@@ -1459,19 +1459,6 @@
 (function() {
     angular
         .module('xApp')
-        .controller('HistoryController', function($scope, history) {
-            $scope.history = history;
-        })
-        .factory('HistoryFactory', function ($resource) {
-            return $resource("/api/history", {}, {
-                query: { method: 'GET', isArray: true }
-            })
-        });
-})();
-
-(function() {
-    angular
-        .module('xApp')
         .constant('GROUPS', {
             admin: 'Administrator',
             dev: 'Developer',
@@ -1581,10 +1568,6 @@ var Password = {
             },
             restrict: 'A',
             link: function($scope, element) {
-                if (!$scope.entry.can_edit) {
-                    return;
-                }
-
                 element.on('click', function(e){
                     $scope.showPassword();
                 });
@@ -1711,6 +1694,19 @@ var Password = {
 (function() {
     angular
         .module('xApp')
+        .controller('HistoryController', function($scope, history) {
+            $scope.history = history;
+        })
+        .factory('HistoryFactory', function ($resource) {
+            return $resource("/api/history", {}, {
+                query: { method: 'GET', isArray: true }
+            })
+        });
+})();
+
+(function() {
+    angular
+        .module('xApp')
         .controller('HomeController', function($scope, recent, hotkeys, $rootScope) {
             $scope.recent = recent;
             $scope.active = {};
@@ -1775,6 +1771,63 @@ var Password = {
                 query: { method: 'GET', isArray: true }
             });
         });
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('AssignedTeamController', teamController);
+
+    function teamController($scope, $modalInstance, teams) {
+        $scope.teams = teams;
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss();
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ProjectTeamController', teamController);
+
+    function teamController($scope, $modalInstance, Api, teams, project, access) {
+        $scope.teams = teams;
+        $scope.access = access;
+        $scope.project = project;
+
+        $scope.canAccess = function(team) {
+            return getAccessIndexForUserId(team.id) != -1;
+        };
+
+        $scope.grant = function(team) {
+            Api.projectTeams.save({
+                team_id: team.id,
+                project_id: $scope.project.id
+            }, function (response) {
+                $scope.access.push(response);
+            });
+        };
+
+        $scope.revoke = function(team) {
+            var accessIndex = getAccessIndexForUserId(team.id);
+
+            Api.projectTeams.delete({
+                id: $scope.access[accessIndex].id
+            }, function() {
+                $scope.access.splice(accessIndex, 1);
+            });
+        };
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss();
+        };
+
+        function getAccessIndexForUserId(teamId) {
+            return $scope.access.map(function (e) { return e.team_id; }).indexOf(teamId);
+        };
+    }
 })();
 
 (function() {
@@ -2012,189 +2065,6 @@ var Password = {
 (function() {
     angular
         .module('xApp')
-        .controller('AssignedTeamController', teamController);
-
-    function teamController($scope, $modalInstance, teams) {
-        $scope.teams = teams;
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss();
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ProjectTeamController', teamController);
-
-    function teamController($scope, $modalInstance, Api, teams, project, access) {
-        $scope.teams = teams;
-        $scope.access = access;
-        $scope.project = project;
-
-        $scope.canAccess = function(team) {
-            return getAccessIndexForUserId(team.id) != -1;
-        };
-
-        $scope.grant = function(team) {
-            Api.projectTeams.save({
-                team_id: team.id,
-                project_id: $scope.project.id
-            }, function (response) {
-                $scope.access.push(response);
-            });
-        };
-
-        $scope.revoke = function(team) {
-            var accessIndex = getAccessIndexForUserId(team.id);
-
-            Api.projectTeams.delete({
-                id: $scope.access[accessIndex].id
-            }, function() {
-                $scope.access.splice(accessIndex, 1);
-            });
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss();
-        };
-
-        function getAccessIndexForUserId(teamId) {
-            return $scope.access.map(function (e) { return e.team_id; }).indexOf(teamId);
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalCreateUserController', ctrl);
-
-    function ctrl($scope, $modalInstance, Api, GROUPS) {
-        $scope.user = {};
-        $scope.groups = GROUPS;
-
-        $scope.ok = function () {
-            Api.user.save($scope.user,
-                function(response) {
-                    $modalInstance.close(response);
-                }
-            );
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss('cancel');
-        };
-    }
-})();
-
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalUpdateUserController', ctrl);
-
-    function ctrl($scope, $modalInstance, Api, user, GROUPS) {
-        $scope.user = user;
-        $scope.groups = GROUPS;
-
-        $scope.ok = function () {
-            Api.user.update($scope.user,
-                function() {
-                    $modalInstance.close($scope.user);
-                }
-            );
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss('cancel');
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ProfileController', ctrl);
-
-    function ctrl($scope, $modalInstance, toaster, Api) {
-        $scope.profile = {
-            old: '',
-            new: '',
-            repeat: ''
-        };
-
-        $scope.clippy = String(localStorage.getItem('clippy')) == 'false';
-
-        $scope.ok = function() {
-            Api.profile.save($scope.profile,
-                function() {
-                    toaster.pop('success', 'Password successfully changed!');
-                    $modalInstance.close();
-                }
-            );
-        };
-
-        $scope.toggleClippy = function() {
-            localStorage.setItem('clippy', $scope.clippy);
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss('cancel');
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('UserListController', controller);
-
-    function controller($scope, $modal, $timeout, toaster, Api, AuthFactory, users) {
-        $scope.users = users;
-
-        $scope.createUser = function() {
-            var modalInstance = $modal.open({
-                templateUrl: '/t/user/create.html',
-                controller: 'ModalCreateUserController'
-            });
-
-            modalInstance.result.then(function (model) {
-                $scope.users.push(model);
-            });
-        };
-
-        $scope.updateUser = function(userId) {
-            var modalInstance = $modal.open({
-                templateUrl: '/t/user/create.html',
-                controller: 'ModalUpdateUserController',
-                resolve: {
-                    user: function(Api) {
-                        return Api.user.get({id: userId});
-                    }
-                }
-            });
-
-            modalInstance.result.then(function (model) {
-                $scope.users[$scope.users.map(function(e) {return e.id}).indexOf(userId)] = model;
-            });
-        };
-
-        $scope.deleteUser = function(userId) {
-            if (!confirm('Are you sure?')) {
-                return;
-            }
-            Api.user.delete({id: userId}, function() {
-                $scope.users.splice($scope.users.map(function(e) {return e.id}).indexOf(userId), 1);
-            });
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
         .controller('createTeamController', createTeamController);
 
     function createTeamController($scope, $modalInstance, Api) {
@@ -2369,5 +2239,131 @@ var Password = {
         function cancel() {
             $modalInstance.dismiss();
         }
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalCreateUserController', ctrl);
+
+    function ctrl($scope, $modalInstance, Api, GROUPS) {
+        $scope.user = {};
+        $scope.groups = GROUPS;
+
+        $scope.ok = function () {
+            Api.user.save($scope.user,
+                function(response) {
+                    $modalInstance.close(response);
+                }
+            );
+        };
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss('cancel');
+        };
+    }
+})();
+
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalUpdateUserController', ctrl);
+
+    function ctrl($scope, $modalInstance, Api, user, GROUPS) {
+        $scope.user = user;
+        $scope.groups = GROUPS;
+
+        $scope.ok = function () {
+            Api.user.update($scope.user,
+                function() {
+                    $modalInstance.close($scope.user);
+                }
+            );
+        };
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss('cancel');
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ProfileController', ctrl);
+
+    function ctrl($scope, $modalInstance, toaster, Api) {
+        $scope.profile = {
+            old: '',
+            new: '',
+            repeat: ''
+        };
+
+        $scope.clippy = String(localStorage.getItem('clippy')) == 'false';
+
+        $scope.ok = function() {
+            Api.profile.save($scope.profile,
+                function() {
+                    toaster.pop('success', 'Password successfully changed!');
+                    $modalInstance.close();
+                }
+            );
+        };
+
+        $scope.toggleClippy = function() {
+            localStorage.setItem('clippy', $scope.clippy);
+        };
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss('cancel');
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('UserListController', controller);
+
+    function controller($scope, $modal, $timeout, toaster, Api, AuthFactory, users) {
+        $scope.users = users;
+
+        $scope.createUser = function() {
+            var modalInstance = $modal.open({
+                templateUrl: '/t/user/create.html',
+                controller: 'ModalCreateUserController'
+            });
+
+            modalInstance.result.then(function (model) {
+                $scope.users.push(model);
+            });
+        };
+
+        $scope.updateUser = function(userId) {
+            var modalInstance = $modal.open({
+                templateUrl: '/t/user/create.html',
+                controller: 'ModalUpdateUserController',
+                resolve: {
+                    user: function(Api) {
+                        return Api.user.get({id: userId});
+                    }
+                }
+            });
+
+            modalInstance.result.then(function (model) {
+                $scope.users[$scope.users.map(function(e) {return e.id}).indexOf(userId)] = model;
+            });
+        };
+
+        $scope.deleteUser = function(userId) {
+            if (!confirm('Are you sure?')) {
+                return;
+            }
+            Api.user.delete({id: userId}, function() {
+                $scope.users.splice($scope.users.map(function(e) {return e.id}).indexOf(userId), 1);
+            });
+        };
     }
 })();

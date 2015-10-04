@@ -72,6 +72,56 @@ body.login-page {
 .table-entries .tags .label {
   margin-right: 3px;
 }
+.loading {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0;
+}
+.loading li {
+  height: 0;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 0;
+  margin: 0;
+  height: 15px;
+  width: 15px;
+  border: 3px solid #4B8396;
+  border-radius: 100%;
+  transform: transformZ(0);
+  animation: LOADING 2s infinite;
+}
+.loading li:nth-child(1n) {
+  left: -20px;
+  animation-delay: 0s;
+}
+.loading li:nth-child(2n) {
+  left: 0;
+  animation-delay: 0.2s;
+}
+.loading li:nth-child(3n) {
+  left: 20px;
+  animation-delay: 0.4s;
+}
+@keyframes LOADING {
+  0% {
+    transform: scale(0.5);
+    background: #4B8396;
+  }
+  50% {
+    transform: scale(1);
+    background: white;
+  }
+  100% {
+    transform: scale(0.5);
+    background: #4B8396;
+  }
+}
 html,
 body {
   margin: 0;
@@ -209,11 +259,6 @@ body {
 .content {
   margin: 30px;
 }
-.loader {
-  margin-left: -32px;
-  margin-top: 5%;
-  padding-left: 50%;
-}
 .modal-header {
   height: 56px;
   background: #5d4157;
@@ -256,6 +301,57 @@ body {
 }
 #container {
   margin-left: 56px;
+}
+
+.loading {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0;
+}
+.loading li {
+  height: 0;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 0;
+  margin: 0;
+  height: 15px;
+  width: 15px;
+  border: 3px solid #4B8396;
+  border-radius: 100%;
+  transform: transformZ(0);
+  animation: LOADING 2s infinite;
+}
+.loading li:nth-child(1n) {
+  left: -20px;
+  animation-delay: 0s;
+}
+.loading li:nth-child(2n) {
+  left: 0;
+  animation-delay: 0.2s;
+}
+.loading li:nth-child(3n) {
+  left: 20px;
+  animation-delay: 0.4s;
+}
+@keyframes LOADING {
+  0% {
+    transform: scale(0.5);
+    background: #4B8396;
+  }
+  50% {
+    transform: scale(1);
+    background: white;
+  }
+  100% {
+    transform: scale(0.5);
+    background: #4B8396;
+  }
 }
 
 html {

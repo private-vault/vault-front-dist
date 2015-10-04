@@ -446,20 +446,23 @@
                 '<a class="btn btn-default btn-xs" title="Please wait..." ng-if="isState(\'waiting\')">' +
                     '<i class="fa fa-spinner fa-spin"></i>' +
                 '</a>' +
-                '<a clip-copy="password" clip-click="copy()" class="btn btn-info btn-xs" title="Copy password" ng-if="isState(\'copy\')">' +
+                '<a class="btn btn-info btn-xs" ng-click="copy()" title="Copy password" ng-if="isState(\'copy\')">' +
                     '<i class="glyphicon glyphicon-save"></i>' +
                 '</a>',
             scope: {
                 entry: '='
             },
-            controller: function($scope, Api, toaster, $rootScope) {
+            controller: function($scope, Api, toaster, $rootScope, CopyService) {
                 $scope.state = 'download';
                 $scope.isState = isState;
                 $scope.download = downloadPassword;
-                $scope.copy = copy;
+                $scope.copy = copyPassword;
                 $scope.password = '';
 
-                $scope.$on("PasswordRequest", function(e, entry){
+                $scope.$on('$destroy', cleanup);
+                $scope.$on("PasswordRequest", onPasswordRequest);
+
+                function onPasswordRequest(e, entry) {
                     if (entry.id != $scope.entry.id) {
                         return;
                     }
@@ -470,26 +473,18 @@
                     }
 
                     if ($scope.state == "copy") {
-                        var textarea = document.createElement("textarea");
-                        textarea.innerHTML = $scope.password;
-                        document.body.appendChild(textarea);
-                        textarea.select();
-                        try {
-                            if (document.execCommand("copy")) {
-                                copy();
-                            }
-                        } catch (e) {}
-                        document.body.removeChild(textarea);
+                      CopyService.copy($scope.password).then(function() {
                         $rootScope.$broadcast("AppFocus");
+                      });
                     }
-                });
+                }
 
                 function isState(state) {
                     return $scope.state == state;
                 }
 
-                function copy() {
-                    toaster.pop('success', "", 'Password copied to clipboard.');
+                function copyPassword() {
+                  CopyService.copy($scope.password);
                 }
 
                 function downloadPassword() {
@@ -500,6 +495,10 @@
                             $scope.state = 'copy';
                         });
                     });
+                }
+
+                function cleanup() {
+                  CopyService.cleanup();
                 }
             }
         };
@@ -1389,6 +1388,79 @@
 })();
 
 (function() {
+  angular
+    .module('xApp')
+    .service('CopyService', service);
+
+  function service($q, toaster) {
+    var fake;
+
+    return {
+      copy: createElementAndCopy,
+      cleanup: cleanup
+    }
+
+    function createElementAndCopy(text) {
+      return createFakeElement(text)
+        .then(copy)
+        .then(cleanup)
+        .then(success, failure);
+    }
+
+    function copy(element) {
+      element.select();
+
+      try {
+        if (document.execCommand("copy")) {
+          return true;
+        }
+      } catch (e) {}
+
+      return $q.reject();
+    }
+
+    function createFakeElement(text) {
+      var deferred = $q.defer();
+
+      try {
+        cleanup();
+        var element = document.createElement("textarea");
+
+        element.style.position = 'absolute';
+        element.style.left = '-9999px';
+        element.style.top = document.body.scrollTop + 'px';
+        element.value = text;
+
+        document.body.appendChild(element);
+        fake = element;
+
+        deferred.resolve(element);
+      } catch (e) {
+        deferred.reject(e);
+      }
+
+      return deferred.promise;
+    }
+
+    function cleanup() {
+      if (fake) {
+        document.body.removeChild(fake);
+      }
+      fake = null;
+    }
+
+    function success() {
+      toaster.pop('success', "", 'Password copied to clipboard.');
+    }
+
+    function failure() {
+      toaster.pop('warning', 'Could not copy', 'Click Command + C to copy');
+      return $q.reject();
+    }
+  }
+})();
+
+(function() {
     angular
         .module('xApp')
         .constant('GROUPS', {
@@ -1449,7 +1521,6 @@ var Password = {
         .module('xApp')
         .directive('loader', loaderDirective)
         .directive('showPassword', showPasswordDirective)
-        .directive('clipCopy', clipCopyDirective)
         .directive('fileRead', fileReadDirective)
         .directive('changeProjectOwner', projectOwnerDirective);
 
@@ -1459,36 +1530,7 @@ var Password = {
             scope: {
                 when: '='
             },
-            template: '<img src="/img/loader.gif" ng-show="when" class="loader">'
-        };
-    }
-
-    function clipCopyDirective() {
-        return {
-            scope: {
-                clipCopy: '&',
-                clipClick: '&'
-            },
-            restrict: 'A',
-            link: function (scope, element, attrs) {
-                // Create the clip object
-                var clip = new ZeroClipboard(element);
-                clip.on( 'load', function(client) {
-                    var onDataRequested = function (client) {
-                        client.setText(scope.$eval(scope.clipCopy));
-
-                        if (angular.isDefined(attrs.clipClick)) {
-                            scope.$apply(scope.clipClick);
-                        }
-                    };
-                    client.on('dataRequested', onDataRequested);
-
-                    scope.$on('$destroy', function() {
-                        client.off('dataRequested', onDataRequested);
-                        client.unclip(element);
-                    });
-                });
-            }
+            template: '<ul class="loading" ng-if="when"><li></li><li></li><li></li></ul>'
         };
     }
 

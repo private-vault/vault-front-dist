@@ -37,7 +37,8 @@ exec(synchRepoAction)
 
         var distPath = local + '/api/public';
 
-        return ncp(distPath, 'dist');
+        return exec('cp -r '+distPath+' dist');
+        //return ncp(distPath, 'dist');
     })
     .then(function() {
         console.log('Removing index.php file...');

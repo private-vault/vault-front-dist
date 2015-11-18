@@ -2,7 +2,6 @@ var Promise = require("bluebird");
 var fs = require("fs");
 var delAsync = Promise.promisify(require("del"));
 var exec = Promise.promisify(require('child_process').exec);
-var ncp = Promise.promisify(require('ncp').ncp);
 
 var local = 'tmp';
 var repo = 'https://github.com/private-vault/vault';
@@ -35,10 +34,9 @@ exec(synchRepoAction)
     .then(function() {
         console.log('Copying compiled files to release...');
 
-        var distPath = local + '/api/public';
+        var distPath = local + '/api/public/*';
 
-        return exec('cp -r '+distPath+' dist');
-        //return ncp(distPath, 'dist');
+        return exec('cp -r '+distPath+' dist/');
     })
     .then(function() {
         console.log('Removing index.php file...');

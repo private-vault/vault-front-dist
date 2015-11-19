@@ -880,37 +880,102 @@
 (function() {
     angular
         .module('xApp')
-        .directive('projectTeam', directive);
+        .directive('projectShowOwner', directive);
 
     function directive() {
         return {
-            restrict: 'E',
-            template:
-                '<a class="btn btn-success btn-xs" title="Assign Team" ng-click="teams()" ng-if="project.can_edit">' +
-                    '<i class="glyphicon glyphicon-link"></i>' +
-                '</a>',
+            restrict: 'A',
             scope: {
-                project: '='
+                projectShowOwner: '='
+            },
+            link: function(scope, element) {
+                element.on('click', scope.openModal);
             },
             controller: function($scope, $modal) {
-                $scope.teams = teams;
+                $scope.openModal = openModal;
 
-                function teams() {
-                  $modal.open({
-                      templateUrl: '/t/project-team/teams.html',
-                      controller: 'ProjectTeamController',
-                      resolve: {
-                          teams: function(Api) {
-                              return Api.team.query();
-                          },
-                          access: function(Api) {
-                              return Api.projectTeams.query({id: $scope.project.id});
-                          },
-                          project: function() {
-                              return $scope.project;
-                          }
-                      }
-                  });
+                function openModal() {
+                    $modal.open({
+                        templateUrl: '/t/project/owner.html',
+                        controller: 'ModalProjectOwnerController',
+                        resolve: {
+                            owner: function(Api) {
+                                return Api.user.get({id: $scope.projectShowOwner.user_id});
+                            }
+                        }
+                    });
+                }
+            }
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .directive('projectShowTeams', directive);
+
+    function directive() {
+        return {
+            restrict: 'A',
+            scope: {
+                projectShowTeams: '='
+            },
+            link: function(scope, element) {
+                element.on('click', scope.openModal);
+            },
+            controller: function($scope, $modal) {
+                $scope.openModal = openModal;
+
+                function openModal() {
+                    $modal.open({
+                        templateUrl: '/t/project-team/assigned.html',
+                        controller: 'AssignedTeamController',
+                        resolve: {
+                            teams: function(Api) {
+                                return Api.assignedTeams.query({id: $scope.projectShowTeams.id});
+                            }
+                        }
+                    });
+                }
+            }
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .directive('projectTeams', directive);
+
+    function directive() {
+        return {
+            restrict: 'A',
+            scope: {
+                projectTeams: '='
+            },
+            link: function(scope, element) {
+                element.on('click', scope.openModal);
+            },
+            controller: function($scope, $modal) {
+                $scope.openModal = openModal;
+
+                function openModal() {
+                    $modal.open({
+                        templateUrl: '/t/project-team/teams.html',
+                        controller: 'ProjectTeamController',
+                        resolve: {
+                            teams: function (Api) {
+                                return Api.team.query();
+                            },
+                            access: function (Api) {
+                                return Api.projectTeams.query({id: $scope.projectTeams.id});
+                            },
+                            project: function () {
+                                return $scope.projectTeams;
+                            }
+                        }
+                    });
                 }
             }
         };
@@ -1718,349 +1783,6 @@ var Password = {
 (function() {
     angular
         .module('xApp')
-        .controller('ModalChangeProjectOwnerController', ctrl);
-
-    function ctrl($scope, $modalInstance, toaster, Api, users, project) {
-        $scope.users = users;
-        $scope.project = project;
-        $scope.form = {owner: 0, assign: 0};
-
-        $scope.project.$promise.then(function() {
-            $scope.form.owner = $scope.project.user_id;
-        });
-
-        $scope.ok = function () {
-            Api.projectOwner.get({
-                id: $scope.project.id,
-                owner: $scope.form.owner,
-                assign: $scope.form.assign
-            }, function() {
-                $modalInstance.close();
-                toaster.pop('success', 'Project owner has been changed.');
-            });
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss();
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalCreateProjectController', ctrl);
-
-    function ctrl($scope, $modalInstance, Api) {
-        $scope.project = {};
-
-        $scope.ok = function () {
-            Api.project.save($scope.project,
-                function(response) {
-                    $modalInstance.close(response);
-                }
-            );
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss();
-        };
-    }
-})();
-
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalProjectJumperController', ctrl);
-
-    function ctrl($rootScope, $scope, $modalInstance, $filter, $state, hotkeys, projects) {
-        $scope.projects = projects;
-        $scope.search = {query: ''};
-        $scope.active = {id: 0};
-
-        $scope.goTo = goTo;
-        $scope.getFiltered = getFiltered;
-        $scope.setActive = setActive;
-
-        $scope.$watch("search", onFilterChanged, true);
-
-        $rootScope.$broadcast('modal:open');
-
-        $scope.projects.$promise.then(function(){
-            if (!$scope.active.id && $scope.projects.length > 0) {
-                $scope.active = $scope.projects[0];
-            }
-        });
-
-        function getFiltered() {
-            return $filter('filter')($scope.projects, { $: $scope.search.query });
-        }
-
-        function goTo(project){
-            $state.go('user.project', {projectId: project.id});
-            $modalInstance.dismiss();
-        }
-
-        function setActive(entry) {
-            $scope.active = entry;
-        }
-
-        function onFilterChanged() {
-            var filtered = getFiltered();
-            var current = _.findIndex(filtered, function(x) {
-                return x.id == $scope.active.id;
-            });
-            if (current == -1 && filtered.length > 0) {
-                $scope.active = filtered[0];
-            }
-        }
-
-        hotkeys.add({
-            combo: 'up',
-            allowIn: ['input'],
-            callback: function(event) {
-                event.preventDefault();
-                var current = _.findIndex(getFiltered(), function(x) {
-                    return x.id == $scope.active.id;
-                });
-
-                var previous = getFiltered()[current - 1];
-                if (previous) {
-                    $scope.active = previous;
-                }
-            }
-        });
-
-        hotkeys.add({
-            combo: 'down',
-            allowIn: ['input'],
-            callback: function(event) {
-                event.preventDefault();
-                var current = _.findIndex(getFiltered(), function(x) {
-                    return x.id == $scope.active.id;
-                });
-
-                var next = getFiltered()[current + 1];
-                if (next) {
-                    $scope.active = next;
-                }
-            }
-        });
-
-        hotkeys.add({
-            combo: 'return',
-            allowIn: ['input'],
-            callback: function(event) {
-                event.preventDefault();
-                if ($scope.active.id) {
-                    goTo($scope.active);
-                }
-            }
-        });
-
-        $scope.$on('$destroy', function() {
-            hotkeys.del('return');
-            hotkeys.del('up');
-            hotkeys.del('down');
-
-            $rootScope.$broadcast('modal:close');
-        });
-    }
-})();
-
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalProjectOwnerController', ctrl);
-
-    function ctrl($scope, $modalInstance, owner) {
-        $scope.owner = owner;
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss('cancel');
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalUpdateProjectController', ctrl);
-
-    function ctrl($scope, $modalInstance, Api, project) {
-        $scope.project = project;
-
-        $scope.ok = function() {
-            Api.project.update(
-                $scope.project,
-                function() {
-                    $modalInstance.close($scope.project);
-                }
-            );
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss('cancel');
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ProjectController', controller);
-
-    function controller($scope, $modal, Api, $filter, projects, active, hotkeys, $state) {
-
-        $scope.projects = projects;
-        $scope.active = {id: active};
-        $scope.search = {query: ''};
-
-        $scope.create = createProject;
-        $scope.getFiltered = getFiltered;
-        $scope.teams = teamsAssigned;
-        $scope.info = projectOwnerInfo;
-        $scope.delete = deleteProject;
-        $scope.setActive = setActive;
-        $scope.goTo = goTo;
-
-        $scope.$watch("search", onFilterChanged, true);
-
-        $scope.$on('$destroy', unbindShortcuts);
-        $scope.$on('modal:open', unbindShortcuts);
-        $scope.$on('modal:close', bindShortcuts);
-
-        bindShortcuts();
-
-        $scope.projects.$promise.then(function(){
-            if (!$scope.active.id && $scope.projects.length > 0) {
-                $scope.active = $scope.projects[0];
-            }
-        });
-
-        function onFilterChanged() {
-            var filtered = getFiltered();
-            var current = _.findIndex(filtered, function(x) {
-                return x.id == $scope.active.id;
-            });
-            if (current == -1 && filtered.length > 0) {
-                $scope.active = filtered[0];
-            }
-        }
-
-        function createProject() {
-            $modal.open({
-                templateUrl: '/t/project/form.html',
-                controller: 'ModalCreateProjectController'
-            }).result.then(function (model) {
-                $scope.projects.push(model);
-            });
-        }
-
-        function teamsAssigned(project) {
-            $modal.open({
-                templateUrl: '/t/project-team/assigned.html',
-                controller: 'AssignedTeamController',
-                resolve: {
-                    teams: function(Api) {
-                        return Api.assignedTeams.query({id: project.id});
-                    }
-                }
-            });
-        }
-
-        function projectOwnerInfo(project) {
-            $modal.open({
-                templateUrl: '/t/project/owner.html',
-                controller: 'ModalProjectOwnerController',
-                resolve: {
-                    owner: function(Api) {
-                        return Api.user.get({id: project.user_id});
-                    }
-                }
-            });
-        }
-
-        function deleteProject(project) {
-            if (!confirm('Are you sure?')) {
-                return;
-            }
-
-            Api.project.delete({id: project.id});
-            $scope.projects.splice($scope.projects.map(function (i) {return i.id;}).indexOf(project.id), 1);
-        }
-
-        function getFiltered() {
-            return $filter('filter')($scope.projects, { $: $scope.search.query });
-        }
-
-        function setActive(entry) {
-            $scope.active = entry;
-        }
-
-        function goTo(project){
-            $state.go('user.project', {projectId: project.id});
-        }
-
-        function bindShortcuts() {
-            hotkeys.add({
-                combo: 'up',
-                description: 'Show project jump window',
-                allowIn: ['input', 'select', 'textarea'],
-                callback: function(event) {
-                    event.preventDefault();
-                    var current = _.findIndex(getFiltered(), function(x) {
-                        return x.id == $scope.active.id;
-                    });
-
-                    var previous = getFiltered()[current - 1];
-                    if (previous) {
-                        $scope.active = previous;
-                    }
-                }
-            });
-
-            hotkeys.add({
-                combo: 'down',
-                description: 'Show project jump window',
-                allowIn: ['input', 'select', 'textarea'],
-                callback: function(event) {
-                    event.preventDefault();
-                    var current = _.findIndex(getFiltered(), function(x) {
-                        return x.id == $scope.active.id;
-                    });
-
-                    var next = getFiltered()[current + 1];
-                    if (next) {
-                        $scope.active = next;
-                    }
-                }
-            });
-
-            hotkeys.add({
-                combo: 'return',
-                description: 'Open project',
-                allowIn: ['input', 'select', 'textarea'],
-                callback: function(event) {
-                    event.preventDefault();
-                    $state.go("user.project", {projectId: $scope.active.id});
-                }
-            });
-        }
-
-        function unbindShortcuts() {
-            hotkeys.del('return');
-            hotkeys.del('up');
-            hotkeys.del('down');
-        }
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
         .controller('AssignedTeamController', teamController);
 
     function teamController($scope, $modalInstance, teams) {
@@ -2291,6 +2013,323 @@ var Password = {
 
         function cancel() {
             $modalInstance.dismiss();
+        }
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalChangeProjectOwnerController', ctrl);
+
+    function ctrl($scope, $modalInstance, toaster, Api, users, project) {
+        $scope.users = users;
+        $scope.project = project;
+        $scope.form = {owner: 0, assign: 0};
+
+        $scope.project.$promise.then(function() {
+            $scope.form.owner = $scope.project.user_id;
+        });
+
+        $scope.ok = function () {
+            Api.projectOwner.get({
+                id: $scope.project.id,
+                owner: $scope.form.owner,
+                assign: $scope.form.assign
+            }, function() {
+                $modalInstance.close();
+                toaster.pop('success', 'Project owner has been changed.');
+            });
+        };
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss();
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalCreateProjectController', ctrl);
+
+    function ctrl($scope, $modalInstance, Api) {
+        $scope.project = {};
+
+        $scope.ok = function () {
+            Api.project.save($scope.project,
+                function(response) {
+                    $modalInstance.close(response);
+                }
+            );
+        };
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss();
+        };
+    }
+})();
+
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalProjectJumperController', ctrl);
+
+    function ctrl($rootScope, $scope, $modalInstance, $filter, $state, hotkeys, projects) {
+        $scope.projects = projects;
+        $scope.search = {query: ''};
+        $scope.active = {id: 0};
+
+        $scope.goTo = goTo;
+        $scope.getFiltered = getFiltered;
+        $scope.setActive = setActive;
+
+        $scope.$watch("search", onFilterChanged, true);
+
+        $rootScope.$broadcast('modal:open');
+
+        $scope.projects.$promise.then(function(){
+            if (!$scope.active.id && $scope.projects.length > 0) {
+                $scope.active = $scope.projects[0];
+            }
+        });
+
+        function getFiltered() {
+            return $filter('filter')($scope.projects, { $: $scope.search.query });
+        }
+
+        function goTo(project){
+            $state.go('user.project', {projectId: project.id});
+            $modalInstance.dismiss();
+        }
+
+        function setActive(entry) {
+            $scope.active = entry;
+        }
+
+        function onFilterChanged() {
+            var filtered = getFiltered();
+            var current = _.findIndex(filtered, function(x) {
+                return x.id == $scope.active.id;
+            });
+            if (current == -1 && filtered.length > 0) {
+                $scope.active = filtered[0];
+            }
+        }
+
+        hotkeys.add({
+            combo: 'up',
+            allowIn: ['input'],
+            callback: function(event) {
+                event.preventDefault();
+                var current = _.findIndex(getFiltered(), function(x) {
+                    return x.id == $scope.active.id;
+                });
+
+                var previous = getFiltered()[current - 1];
+                if (previous) {
+                    $scope.active = previous;
+                }
+            }
+        });
+
+        hotkeys.add({
+            combo: 'down',
+            allowIn: ['input'],
+            callback: function(event) {
+                event.preventDefault();
+                var current = _.findIndex(getFiltered(), function(x) {
+                    return x.id == $scope.active.id;
+                });
+
+                var next = getFiltered()[current + 1];
+                if (next) {
+                    $scope.active = next;
+                }
+            }
+        });
+
+        hotkeys.add({
+            combo: 'return',
+            allowIn: ['input'],
+            callback: function(event) {
+                event.preventDefault();
+                if ($scope.active.id) {
+                    goTo($scope.active);
+                }
+            }
+        });
+
+        $scope.$on('$destroy', function() {
+            hotkeys.del('return');
+            hotkeys.del('up');
+            hotkeys.del('down');
+
+            $rootScope.$broadcast('modal:close');
+        });
+    }
+})();
+
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalProjectOwnerController', ctrl);
+
+    function ctrl($scope, $modalInstance, owner) {
+        $scope.owner = owner;
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss('cancel');
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalUpdateProjectController', ctrl);
+
+    function ctrl($scope, $modalInstance, Api, project) {
+        $scope.project = project;
+
+        $scope.ok = function() {
+            Api.project.update(
+                $scope.project,
+                function() {
+                    $modalInstance.close($scope.project);
+                }
+            );
+        };
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss('cancel');
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ProjectController', controller);
+
+    function controller($scope, $modal, Api, $filter, projects, active, hotkeys, $state) {
+
+        $scope.projects = projects;
+        $scope.active = {id: active};
+        $scope.search = {query: ''};
+
+        $scope.create = createProject;
+        $scope.delete = deleteProject;
+        $scope.getFiltered = getFiltered;
+        $scope.setActive = setActive;
+        $scope.goTo = goTo;
+
+        $scope.$watch("search", onFilterChanged, true);
+
+        $scope.$on('$destroy', unbindShortcuts);
+        $scope.$on('modal:open', unbindShortcuts);
+        $scope.$on('modal:close', bindShortcuts);
+
+        bindShortcuts();
+
+        $scope.projects.$promise.then(function(){
+            if (!$scope.active.id && $scope.projects.length > 0) {
+                $scope.active = $scope.projects[0];
+            }
+        });
+
+        function onFilterChanged() {
+            var filtered = getFiltered();
+            var current = _.findIndex(filtered, function(x) {
+                return x.id == $scope.active.id;
+            });
+            if (current == -1 && filtered.length > 0) {
+                $scope.active = filtered[0];
+            }
+        }
+
+        function createProject() {
+            $modal.open({
+                templateUrl: '/t/project/form.html',
+                controller: 'ModalCreateProjectController'
+            }).result.then(function (model) {
+                $scope.projects.push(model);
+            });
+        }
+
+        function deleteProject(project) {
+            if (!confirm('Are you sure?')) {
+                return;
+            }
+
+            Api.project.delete({id: project.id});
+            $scope.projects.splice($scope.projects.map(function (i) {return i.id;}).indexOf(project.id), 1);
+        }
+
+        function getFiltered() {
+            return $filter('filter')($scope.projects, { $: $scope.search.query });
+        }
+
+        function setActive(entry) {
+            $scope.active = entry;
+        }
+
+        function goTo(project){
+            $state.go('user.project', {projectId: project.id});
+        }
+
+        function bindShortcuts() {
+            hotkeys.add({
+                combo: 'up',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    var current = _.findIndex(getFiltered(), function(x) {
+                        return x.id == $scope.active.id;
+                    });
+
+                    var previous = getFiltered()[current - 1];
+                    if (previous) {
+                        $scope.active = previous;
+                    }
+                }
+            });
+
+            hotkeys.add({
+                combo: 'down',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    var current = _.findIndex(getFiltered(), function(x) {
+                        return x.id == $scope.active.id;
+                    });
+
+                    var next = getFiltered()[current + 1];
+                    if (next) {
+                        $scope.active = next;
+                    }
+                }
+            });
+
+            hotkeys.add({
+                combo: 'return',
+                description: 'Open project',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    $state.go("user.project", {projectId: $scope.active.id});
+                }
+            });
+        }
+
+        function unbindShortcuts() {
+            hotkeys.del('return');
+            hotkeys.del('up');
+            hotkeys.del('down');
         }
     }
 })();

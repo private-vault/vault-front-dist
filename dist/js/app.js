@@ -56,25 +56,27 @@
                 templateUrl: '/t/home/home.html',
                 controller: function($scope, $rootScope, $location, $modal, projects, AuthFactory, Api, $filter, $state, hotkeys) {
                     $scope.projects = projects;
-
                     $scope.login = AuthFactory.getUser();
-
-                    $scope.jump = jump;
                     $scope.isEntryActive = $state.is('user.project');
 
                     hotkeys.add({
-                        combo: 'ctrl+p',
+                        combo: 'ctrl+k',
                         description: 'Show project jump window',
                         allowIn: ['input', 'select', 'textarea'],
-                        callback: function(event, hotkey) {
+                        callback: function(event) {
                             event.preventDefault();
-                            jump();
+                            $modal.open({
+                                templateUrl: '/t/project/projectJumper.html',
+                                controller: 'ModalProjectJumperController',
+                                size: 'sm',
+                                resolve: {
+                                    projects: function() {
+                                        return $scope.projects;
+                                    }
+                                }
+                            });
                         }
                     });
-
-                    function jump() {
-                        $scope.$broadcast('toggleJump');
-                    }
 
                     $rootScope.$on('$stateChangeStart', function(event, toState) {
                         $scope.isEntryActive = toState.name == 'user.project' || toState.name == 'user.projects';
@@ -121,18 +123,10 @@
                     active: function($stateParams, entries) {
                         if ($stateParams.active) {
                             return entries.$promise.then(function(entries) {
-                                var key = _.find(
+                                return _.find(
                                     entries,
                                     _.matchesProperty('id', parseInt($stateParams.active))
                                 );
-
-                                if (key == undefined) { // for some odd reason PHP 5.4 returns IDS as strings
-                                    key = _.find(
-                                        entries,
-                                        _.matchesProperty('id', $stateParams.active)
-                                    );
-                                }
-                                return key;
                             });
                         }
                         return {};
@@ -886,64 +880,6 @@
 (function() {
     angular
         .module('xApp')
-        .directive('projectJump', projectJumpDirective);
-
-    function projectJumpDirective() {
-        return {
-            restrict: 'E',
-            template:
-                '<div class="project-jump" ng-class="{in: isActive}"><ui-select ng-model="project" on-select="openProject($item)" focus-on="openJump">' +
-                    '<ui-select-match placeholder="Quick project jump">{{ $select.selected.name }}</ui-select-match>' +
-                    '<ui-select-choices repeat="project.id as pro in projects | filter: {name: $select.search}">' +
-                        '<div ng-bind-html="pro.name | highlight: $select.search"></div>' +
-                        '<div class="muted small">{{ pro.description }}</div>' +
-                    '</ui-select-choices>' +
-                '</ui-select></div>',
-            scope: {
-                projects: '='
-            },
-            controller: function($scope, $state, hotkeys) {
-                $scope.openProject = openProject;
-                $scope.isActive = false;
-
-                $scope.$on('toggleJump', function () {
-                    $scope.isActive = !$scope.isActive;
-                    $scope.$broadcast('openJump');
-
-                    if ($scope.isActive) {
-                        hotkeys.add({
-                            combo: 'esc',
-                            description: 'Close project jump',
-                            allowIn: ['input', 'select'],
-                            callback: function() {
-                                close();
-                            }
-                        });
-                    } else {
-                        close();
-                    }
-                });
-
-                function close() {
-                    $scope.isActive = false;
-                    hotkeys.del('esc');
-                }
-
-                function openProject(project) {
-                    $state.go('user.project', {projectId: project.id});
-                    close();
-                    if (document.activeElement) {
-                        document.activeElement.blur();
-                    }
-                }
-            }
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
         .directive('projectTeam', directive);
 
     function directive() {
@@ -1058,57 +994,21 @@
             }
         });
 
+        $scope.$watch("search", onFilterChanged, true);
+
         $scope.$on('entry:create', onEntryCreate);
         $scope.$on('entry:update', onEntryUpdate);
         $scope.$on('entry:delete', onEntryDelete);
-        $scope.$on('$destroy', onDestroy);
-        $scope.$watch("search", onFilterChanged, true);
 
-        hotkeys.add({
-            combo: 'return',
-            description: 'Download and copy password',
-            allowIn: ['input', 'select', 'textarea'],
-            callback: function(event, hotkey) {
-                $rootScope.$broadcast("PasswordRequest", $scope.active);
-            }
+        $scope.$on('$destroy', unbindShortcuts);
+        $scope.$on('modal:open', unbindShortcuts);
+        $scope.$on('modal:close', bindShortcuts);
+
+        $scope.$on('project:update', function(event, project) {
+            $scope.project = project;
         });
 
-
-        hotkeys.add({
-            combo: 'up',
-            description: 'Show project jump window',
-            allowIn: ['input', 'select', 'textarea'],
-            callback: function(event, hotkey) {
-                event.preventDefault();
-                var current = _.findIndex(getFiltered(), function(x) {
-                    return x.id == $scope.active.id;
-                });
-
-                var previous = getFiltered()[current - 1];
-                if (previous) {
-                    $scope.active = previous;
-                } else {
-                    $rootScope.$broadcast("AppFocus");
-                }
-            }
-        });
-
-        hotkeys.add({
-            combo: 'down',
-            description: 'Show project jump window',
-            allowIn: ['input', 'select', 'textarea'],
-            callback: function(event, hotkey) {
-                event.preventDefault();
-                var current = _.findIndex(getFiltered(), function(x) {
-                    return x.id == $scope.active.id;
-                });
-
-                var next = getFiltered()[current + 1];
-                if (next) {
-                    $scope.active = next;
-                }
-            }
-        });
+        bindShortcuts();
 
         function onFilterChanged() {
             var filtered = getFiltered();
@@ -1156,7 +1056,54 @@
             return $scope.entries.map(function(e) {return parseInt(e.id)}).indexOf(parseInt(entry.id));
         }
 
-        function onDestroy() {
+        function bindShortcuts() {
+            hotkeys.add({
+                combo: 'return',
+                description: 'Download and copy password',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function() {
+                    $rootScope.$broadcast("PasswordRequest", $scope.active);
+                }
+            });
+
+            hotkeys.add({
+                combo: 'up',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    var current = _.findIndex(getFiltered(), function(x) {
+                        return x.id == $scope.active.id;
+                    });
+
+                    var previous = getFiltered()[current - 1];
+                    if (previous) {
+                        $scope.active = previous;
+                    } else {
+                        $rootScope.$broadcast("AppFocus");
+                    }
+                }
+            });
+
+            hotkeys.add({
+                combo: 'down',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    var current = _.findIndex(getFiltered(), function(x) {
+                        return x.id == $scope.active.id;
+                    });
+
+                    var next = getFiltered()[current + 1];
+                    if (next) {
+                        $scope.active = next;
+                    }
+                }
+            });
+        }
+
+        function unbindShortcuts() {
             hotkeys.del('return');
             hotkeys.del('up');
             hotkeys.del('down');
@@ -1825,6 +1772,107 @@ var Password = {
 (function() {
     angular
         .module('xApp')
+        .controller('ModalProjectJumperController', ctrl);
+
+    function ctrl($rootScope, $scope, $modalInstance, $filter, $state, hotkeys, projects) {
+        $scope.projects = projects;
+        $scope.search = {query: ''};
+        $scope.active = {id: 0};
+
+        $scope.goTo = goTo;
+        $scope.getFiltered = getFiltered;
+        $scope.setActive = setActive;
+
+        $scope.$watch("search", onFilterChanged, true);
+
+        $rootScope.$broadcast('modal:open');
+
+        $scope.projects.$promise.then(function(){
+            if (!$scope.active.id && $scope.projects.length > 0) {
+                $scope.active = $scope.projects[0];
+            }
+        });
+
+        function getFiltered() {
+            return $filter('filter')($scope.projects, { $: $scope.search.query });
+        }
+
+        function goTo(project){
+            $state.go('user.project', {projectId: project.id});
+            $modalInstance.dismiss();
+        }
+
+        function setActive(entry) {
+            $scope.active = entry;
+        }
+
+        function onFilterChanged() {
+            var filtered = getFiltered();
+            var current = _.findIndex(filtered, function(x) {
+                return x.id == $scope.active.id;
+            });
+            if (current == -1 && filtered.length > 0) {
+                $scope.active = filtered[0];
+            }
+        }
+
+        hotkeys.add({
+            combo: 'up',
+            allowIn: ['input'],
+            callback: function(event) {
+                event.preventDefault();
+                var current = _.findIndex(getFiltered(), function(x) {
+                    return x.id == $scope.active.id;
+                });
+
+                var previous = getFiltered()[current - 1];
+                if (previous) {
+                    $scope.active = previous;
+                }
+            }
+        });
+
+        hotkeys.add({
+            combo: 'down',
+            allowIn: ['input'],
+            callback: function(event) {
+                event.preventDefault();
+                var current = _.findIndex(getFiltered(), function(x) {
+                    return x.id == $scope.active.id;
+                });
+
+                var next = getFiltered()[current + 1];
+                if (next) {
+                    $scope.active = next;
+                }
+            }
+        });
+
+        hotkeys.add({
+            combo: 'return',
+            allowIn: ['input'],
+            callback: function(event) {
+                event.preventDefault();
+                if ($scope.active.id) {
+                    goTo($scope.active);
+                }
+            }
+        });
+
+        $scope.$on('$destroy', function() {
+            hotkeys.del('return');
+            hotkeys.del('up');
+            hotkeys.del('down');
+
+            $rootScope.$broadcast('modal:close');
+        });
+    }
+})();
+
+
+(function() {
+    angular
+        .module('xApp')
         .controller('ModalProjectOwnerController', ctrl);
 
     function ctrl($scope, $modalInstance, owner) {
@@ -1868,6 +1916,8 @@ var Password = {
 
         $scope.projects = projects;
         $scope.active = {id: active};
+        $scope.search = {query: ''};
+
         $scope.create = createProject;
         $scope.getFiltered = getFiltered;
         $scope.teams = teamsAssigned;
@@ -1875,8 +1925,15 @@ var Password = {
         $scope.delete = deleteProject;
         $scope.setActive = setActive;
         $scope.goTo = goTo;
-        $scope.search = {query: ''};
+
         $scope.$watch("search", onFilterChanged, true);
+
+        $scope.$on('$destroy', unbindShortcuts);
+        $scope.$on('modal:open', unbindShortcuts);
+        $scope.$on('modal:close', bindShortcuts);
+
+        bindShortcuts();
+
         $scope.projects.$promise.then(function(){
             if (!$scope.active.id && $scope.projects.length > 0) {
                 $scope.active = $scope.projects[0];
@@ -1943,60 +2000,61 @@ var Password = {
             $scope.active = entry;
         }
 
-        hotkeys.add({
-            combo: 'up',
-            description: 'Show project jump window',
-            allowIn: ['input', 'select', 'textarea'],
-            callback: function(event, hotkey) {
-                event.preventDefault();
-                var current = _.findIndex(getFiltered(), function(x) {
-                    return x.id == $scope.active.id;
-                });
-
-                var previous = getFiltered()[current - 1];
-                if (previous) {
-                    $scope.active = previous;
-                }
-            }
-        });
-
-        hotkeys.add({
-            combo: 'down',
-            description: 'Show project jump window',
-            allowIn: ['input', 'select', 'textarea'],
-            callback: function(event, hotkey) {
-                event.preventDefault();
-                var current = _.findIndex(getFiltered(), function(x) {
-                    return x.id == $scope.active.id;
-                });
-
-                var next = getFiltered()[current + 1];
-                if (next) {
-                    $scope.active = next;
-                }
-            }
-        });
-
         function goTo(project){
             $state.go('user.project', {projectId: project.id});
         }
 
+        function bindShortcuts() {
+            hotkeys.add({
+                combo: 'up',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    var current = _.findIndex(getFiltered(), function(x) {
+                        return x.id == $scope.active.id;
+                    });
 
-        hotkeys.add({
-            combo: 'return',
-            description: 'Open project',
-            allowIn: ['input', 'select', 'textarea'],
-            callback: function(event, hotkey) {
-                event.preventDefault();
-                $state.go("user.project", {projectId: $scope.active.id});
-            }
-        });
+                    var previous = getFiltered()[current - 1];
+                    if (previous) {
+                        $scope.active = previous;
+                    }
+                }
+            });
 
-        $scope.$on('$destroy', function(){
+            hotkeys.add({
+                combo: 'down',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    var current = _.findIndex(getFiltered(), function(x) {
+                        return x.id == $scope.active.id;
+                    });
+
+                    var next = getFiltered()[current + 1];
+                    if (next) {
+                        $scope.active = next;
+                    }
+                }
+            });
+
+            hotkeys.add({
+                combo: 'return',
+                description: 'Open project',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    $state.go("user.project", {projectId: $scope.active.id});
+                }
+            });
+        }
+
+        function unbindShortcuts() {
             hotkeys.del('return');
             hotkeys.del('up');
             hotkeys.del('down');
-        });
+        }
     }
 })();
 

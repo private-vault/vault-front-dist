@@ -207,6 +207,57 @@
 (function() {
     angular
         .module('xApp')
+        .factory('Api', apiFactory);
+
+    function apiFactory($resource) {
+        return {
+            auth: $resource("/internal/auth"),
+            project: $resource("/api/project/:id", null, enableCustom),
+            projectKeys: $resource("/api/project/keys/:id"),
+            assignedTeams: $resource("/api/project/teams/:id", null, enableCustom),
+            user: $resource("/api/user/:id", null, enableCustom),
+            team: $resource("/api/team/:id", null, enableCustom),
+            teamMembers: $resource("/api/teamMembers/:id", null, enableCustom),
+            projectTeams: $resource("/api/projectTeams/:id", null, enableCustom),
+            entryTeams: $resource("/api/entryTeams/:id", null, enableCustom),
+            entryTags: $resource("/api/entryTags/:id", null, enableCustom),
+            authStatus: $resource("/internal/auth/status", null),
+            profile: $resource("/api/profile", null, enableCustom),
+            share: $resource("/api/share/:id", null, enableCustom),
+            entry: $resource("/api/entry/:id", null, angular.extend(enableCustom, {
+                password: { method: 'GET', params: {id: '@id'} }
+            })),
+            entryAccess: $resource("/api/entry/access/:id", null),
+            entryPassword: $resource("/api/entry/password/:id", {}, {
+                password: { method: 'GET', params: {id: '@id'} }
+            })
+        }
+    }
+
+    var enableCustom = {
+        update: {
+            method: 'PUT', params: {id: '@id'}
+        },
+        delete: {
+            method: 'DELETE', params: {id: '@id'}
+        }
+    };
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ApiController', ctrl);
+
+    function ctrl($scope, AuthFactory) {
+        $scope.code = AuthFactory.getCode();
+        $scope.user = AuthFactory.getUser().email;
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
         .controller('AuthController', authController);
 
     function authController($scope, AuthFactory) {
@@ -366,57 +417,6 @@
 (function() {
     angular
         .module('xApp')
-        .factory('Api', apiFactory);
-
-    function apiFactory($resource) {
-        return {
-            auth: $resource("/internal/auth"),
-            project: $resource("/api/project/:id", null, enableCustom),
-            projectKeys: $resource("/api/project/keys/:id"),
-            assignedTeams: $resource("/api/project/teams/:id", null, enableCustom),
-            user: $resource("/api/user/:id", null, enableCustom),
-            team: $resource("/api/team/:id", null, enableCustom),
-            teamMembers: $resource("/api/teamMembers/:id", null, enableCustom),
-            projectTeams: $resource("/api/projectTeams/:id", null, enableCustom),
-            entryTeams: $resource("/api/entryTeams/:id", null, enableCustom),
-            entryTags: $resource("/api/entryTags/:id", null, enableCustom),
-            authStatus: $resource("/internal/auth/status", null),
-            profile: $resource("/api/profile", null, enableCustom),
-            share: $resource("/api/share/:id", null, enableCustom),
-            entry: $resource("/api/entry/:id", null, angular.extend(enableCustom, {
-                password: { method: 'GET', params: {id: '@id'} }
-            })),
-            entryAccess: $resource("/api/entry/access/:id", null),
-            entryPassword: $resource("/api/entry/password/:id", {}, {
-                password: { method: 'GET', params: {id: '@id'} }
-            })
-        }
-    }
-
-    var enableCustom = {
-        update: {
-            method: 'PUT', params: {id: '@id'}
-        },
-        delete: {
-            method: 'DELETE', params: {id: '@id'}
-        }
-    };
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ApiController', ctrl);
-
-    function ctrl($scope, AuthFactory) {
-        $scope.code = AuthFactory.getCode();
-        $scope.user = AuthFactory.getUser().email;
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
         .directive('copyPassword', copyPasswordDirective);
 
     function copyPasswordDirective() {
@@ -495,13 +495,12 @@
 
     function entryAccessInfoDirective() {
         return {
-            restrict: 'E',
-            template:
-                '<a class="btn btn-primary btn-xs" title="Access Information" ng-click="info()" ng-if="!entry.can_edit">' +
-                    '<i class="glyphicon glyphicon-info-sign"></i>' +
-                '</a>',
+            restrict: 'A',
             scope: {
-                entry: '='
+                entryAccessInfo: '='
+            },
+            link: function($scope, $elem) {
+                $elem.on('click', $scope.info);
             },
             controller: function($rootScope, $scope, $modal) {
                 $scope.info = entryInfo;
@@ -509,10 +508,16 @@
                 function entryInfo() {
                     $modal.open({
                         templateUrl: '/t/entry/access.html',
-                        controller: 'ModalAccessController',
+                        controller: function($scope, $modalInstance, access, entry) {
+                            $scope.access = access;
+                            $scope.entry = entry;
+                        },
                         resolve: {
                             access: function(Api) {
-                                return Api.entryAccess.query({id: $scope.entry.id});
+                                return Api.entryAccess.query({id: $scope.entryAccessInfo.id});
+                            },
+                            entry: function() {
+                                return $scope.entryAccessInfo;
                             }
                         }
                     });
@@ -846,46 +851,13 @@
 (function() {
     angular
         .module('xApp')
-        .directive('projectShowOwner', directive);
+        .directive('projectInfo', directive);
 
     function directive() {
         return {
             restrict: 'A',
             scope: {
-                projectShowOwner: '='
-            },
-            link: function(scope, element) {
-                element.on('click', scope.openModal);
-            },
-            controller: function($scope, $modal) {
-                $scope.openModal = openModal;
-
-                function openModal() {
-                    $modal.open({
-                        templateUrl: '/t/project/owner.html',
-                        controller: 'ModalProjectOwnerController',
-                        resolve: {
-                            owner: function(Api) {
-                                return Api.user.get({id: $scope.projectShowOwner.user_id});
-                            }
-                        }
-                    });
-                }
-            }
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .directive('projectShowTeams', directive);
-
-    function directive() {
-        return {
-            restrict: 'A',
-            scope: {
-                projectShowTeams: '='
+                projectInfo: '='
             },
             link: function(scope, element) {
                 element.on('click', scope.openModal);
@@ -896,10 +868,20 @@
                 function openModal() {
                     $modal.open({
                         templateUrl: '/t/project-team/assigned.html',
-                        controller: 'AssignedTeamController',
+                        controller: function($scope, teams, project, owner) {
+                            $scope.teams = teams;
+                            $scope.project = project;
+                            $scope.owner = owner;
+                        },
                         resolve: {
                             teams: function(Api) {
-                                return Api.assignedTeams.query({id: $scope.projectShowTeams.id});
+                                return Api.assignedTeams.query({id: $scope.projectInfo.id});
+                            },
+                            project: function() {
+                                return $scope.projectInfo;
+                            },
+                            owner: function(Api) {
+                                return Api.user.get({id: $scope.projectInfo.user_id});
                             }
                         }
                     });
@@ -1003,19 +985,6 @@
             }
         };
     }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('HistoryController', function($scope, history) {
-            $scope.history = history;
-        })
-        .factory('HistoryFactory', function ($resource) {
-            return $resource("/api/history", {}, {
-                query: { method: 'GET', isArray: true }
-            })
-        });
 })();
 
 (function() {
@@ -1160,18 +1129,6 @@
             document.getElementById('e-'+$scope.active.id).scrollIntoViewIfNeeded();
         }
     }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalAccessController', function($scope, $modalInstance, access) {
-        $scope.access = access;
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss('cancel');
-        };
-    });
 })();
 
 (function() {
@@ -1622,58 +1579,14 @@ var Password = {
 (function() {
     angular
         .module('xApp')
-        .controller('AssignedTeamController', teamController);
-
-    function teamController($scope, $modalInstance, teams) {
-        $scope.teams = teams;
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss();
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ProjectTeamController', teamController);
-
-    function teamController($scope, $modalInstance, Api, teams, project, access) {
-        $scope.teams = teams;
-        $scope.access = access;
-        $scope.project = project;
-
-        $scope.canAccess = function(team) {
-            return getAccessIndexForUserId(team.id) != -1;
-        };
-
-        $scope.grant = function(team) {
-            Api.projectTeams.save({
-                team_id: team.id,
-                project_id: $scope.project.id
-            }, function (response) {
-                $scope.access.push(response);
-            });
-        };
-
-        $scope.revoke = function(team) {
-            var accessIndex = getAccessIndexForUserId(team.id);
-
-            Api.projectTeams.delete({
-                id: $scope.access[accessIndex].id
-            }, function() {
-                $scope.access.splice(accessIndex, 1);
-            });
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss();
-        };
-
-        function getAccessIndexForUserId(teamId) {
-            return $scope.access.map(function (e) { return e.team_id; }).indexOf(teamId);
-        };
-    }
+        .controller('HistoryController', function($scope, history) {
+            $scope.history = history;
+        })
+        .factory('HistoryFactory', function ($resource) {
+            return $resource("/api/history", {}, {
+                query: { method: 'GET', isArray: true }
+            })
+        });
 })();
 
 (function() {
@@ -1898,20 +1811,6 @@ var Password = {
 (function() {
     angular
         .module('xApp')
-        .controller('ModalProjectOwnerController', ctrl);
-
-    function ctrl($scope, $modalInstance, owner) {
-        $scope.owner = owner;
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss('cancel');
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
         .controller('ModalUpdateProjectController', ctrl);
 
     function ctrl($scope, $modalInstance, Api, project) {
@@ -2055,6 +1954,45 @@ var Password = {
 
         function scrollTo() {
             document.getElementById('p-'+$scope.active.id).scrollIntoViewIfNeeded();
+        }
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ProjectTeamController', teamController);
+
+    function teamController($scope, Api, teams, project, access) {
+        $scope.teams = teams;
+        $scope.access = access;
+        $scope.project = project;
+
+        $scope.canAccess = function(team) {
+            return getAccessIndexForUserId(team.id) != -1;
+        };
+
+        $scope.grant = function(team) {
+            Api.projectTeams.save({
+                team_id: team.id,
+                project_id: $scope.project.id
+            }, function (response) {
+                $scope.access.push(response);
+            });
+        };
+
+        $scope.revoke = function(team) {
+            var accessIndex = getAccessIndexForUserId(team.id);
+
+            Api.projectTeams.delete({
+                id: $scope.access[accessIndex].id
+            }, function() {
+                $scope.access.splice(accessIndex, 1);
+            });
+        };
+
+        function getAccessIndexForUserId(teamId) {
+            return $scope.access.map(function (e) { return e.team_id; }).indexOf(teamId);
         }
     }
 })();

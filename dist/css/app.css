@@ -9,7 +9,7 @@ body.login-page {
   background-size: cover;
 }
 .signin-card {
-  margin-top: 25vh;
+  margin-top: 20vh;
   color: white;
   text-align: center;
   text-transform: uppercase;
@@ -72,6 +72,10 @@ body.login-page {
 .table-entries .tags .label {
   margin-right: 3px;
 }
+.loading-holder {
+  display: block;
+  margin: 100px 0;
+}
 .loading {
   list-style: none;
   margin: 0;
@@ -83,11 +87,9 @@ body.login-page {
   font-size: 0;
 }
 .loading li {
-  height: 0;
   position: absolute;
   top: 50%;
   left: 0;
-  width: 0;
   margin: 0;
   height: 15px;
   width: 15px;
@@ -164,7 +166,7 @@ body {
   overflow-y: scroll;
 }
 .project-jump > .scroller {
-  max-height: 400px;
+  max-height: 600px;
   overflow-y: scroll;
   margin-right: -10px;
 }
@@ -193,6 +195,11 @@ body {
 }
 .cursor {
   cursor: pointer;
+}
+.side-logo {
+  padding: 12px;
+  display: block;
+  width: 100%;
 }
 .btn-side-menu {
   padding: 12px;
@@ -262,21 +269,20 @@ body {
 }
 .modal-header {
   height: 56px;
-  background: #5d4157;
   padding: 1.1em;
+  text-align: center;
+  border: none;
 }
 .modal-header h3 {
-  color: #E7EDEA;
+  color: #333;
   margin: 0;
 }
 .modal-content {
-  border: 1px solid #4F565E;
-  border-radius: 2px;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
+  border: none;
+  box-shadow: none;
+  background: transparent;
 }
 .modal-footer {
-  background: #F1F1F1;
-  padding: 10px;
   border-top: none;
 }
 .password {
@@ -303,7 +309,47 @@ body {
 #container {
   margin-left: 56px;
 }
+.page-header .top-search,
+.page-header a {
+  margin-top: -3px;
+}
+.top-search {
+  background: #FBFBFB;
+}
+.modal-backdrop.in {
+  opacity: 1;
+}
+.modal-backdrop {
+  background-color: rgba(255, 255, 255, 0.95);
+}
+.form-control {
+  border-radius: 1px;
+  background-color: #FBFBFB;
+}
+.close.modal-close {
+  position: fixed;
+  top: 30px;
+  right: 40px;
+  font-size: 2em;
+  opacity: 0.5;
+  padding: 15px;
+  outline: none;
+}
+.close.modal-close:hover {
+  opacity: 0.7;
+}
+.btn {
+  border-radius: 1px;
+}
+.modal.fade .modal-dialog {
+  transition: opacity .3s ease;
+  transform: none;
+}
 
+.loading-holder {
+  display: block;
+  margin: 100px 0;
+}
 .loading {
   list-style: none;
   margin: 0;
@@ -315,11 +361,9 @@ body {
   font-size: 0;
 }
 .loading li {
-  height: 0;
   position: absolute;
   top: 50%;
   left: 0;
-  width: 0;
   margin: 0;
   height: 15px;
   width: 15px;
@@ -366,7 +410,7 @@ body.login-page {
   background-size: cover;
 }
 .signin-card {
-  margin-top: 25vh;
+  margin-top: 20vh;
   color: white;
   text-align: center;
   text-transform: uppercase;

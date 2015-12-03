@@ -4,7 +4,7 @@ var delAsync = Promise.promisify(require("del"));
 var exec = Promise.promisify(require('child_process').exec);
 
 var local = 'tmp';
-var repo = 'https://github.com/private-vault/vault';
+var repo = 'https://github.com/vaulthq/vault';
 
 var branch = process.argv[2] || 'master';
 

@@ -417,6 +417,348 @@
 (function() {
     angular
         .module('xApp')
+        .controller('EntryController', controller);
+
+    function controller($scope, $filter, hotkeys, entries, project, active, $rootScope) {
+
+        $scope.entries = entries;
+        $scope.project = project;
+        $scope.active = active;
+        $scope.search = {};
+        $scope.tags = [];
+        $scope.setActive = setActive;
+        $scope.getFiltered = getFiltered;
+
+        $scope.entries.$promise.then(function(){
+            if (!$scope.active || !$scope.active.id && $scope.entries.length > 0) {
+                $scope.active = $scope.entries[0];
+            }
+        });
+
+        $scope.$watch("search", onFilterChanged, true);
+
+        $scope.$on('entry:create', onEntryCreate);
+        $scope.$on('entry:update', onEntryUpdate);
+        $scope.$on('entry:delete', onEntryDelete);
+
+        $scope.$on('$destroy', unbindShortcuts);
+        $scope.$on('modal:open', unbindShortcuts);
+        $scope.$on('modal:close', bindShortcuts);
+
+        $scope.$on('project:update', function(event, project) {
+            $scope.project = project;
+        });
+
+        bindShortcuts();
+
+        function onFilterChanged() {
+            var filtered = getFiltered();
+            var current = _.findIndex(filtered, function(x) {
+                return $scope.active && x.id == $scope.active.id;
+            });
+            if (current == -1 && filtered.length > 0) {
+                $scope.active = filtered[0];
+            }
+        }
+
+        function getFiltered() {
+            return $filter('filter')($scope.entries, { $: $scope.search.query });
+        }
+
+        function setActive(entry) {
+            $scope.active = entry;
+        }
+
+        function onEntryCreate(event, model) {
+            $scope.entries.push(model);
+        }
+
+        function onEntryUpdate(event, model) {
+            var index = getEntryIndex(model);
+
+            if (index >= 0) {
+                $scope.entries[index] = model;
+            }
+
+            setActive(model);
+        }
+
+        function onEntryDelete(event, model) {
+            var index = getEntryIndex(model);
+
+            if (index >= 0) {
+                $scope.entries.splice(index, 1);
+            }
+
+            setActive({});
+        }
+
+        function getEntryIndex(entry) {
+            return $scope.entries.map(function(e) {return parseInt(e.id)}).indexOf(parseInt(entry.id));
+        }
+
+        function bindShortcuts() {
+            hotkeys.add({
+                combo: 'return',
+                description: 'Download and copy password',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function() {
+                    $rootScope.$broadcast("PasswordRequest", $scope.active);
+                }
+            });
+
+            hotkeys.add({
+                combo: 'up',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    var current = _.findIndex(getFiltered(), function(x) {
+                        return x.id == $scope.active.id;
+                    });
+
+                    var previous = getFiltered()[current - 1];
+                    if (previous) {
+                        $scope.active = previous;
+                        scrollTo();
+                    } else {
+                        $rootScope.$broadcast("AppFocus");
+                    }
+                }
+            });
+
+            hotkeys.add({
+                combo: 'down',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event) {
+                    event.preventDefault();
+                    var current = _.findIndex(getFiltered(), function(x) {
+                        return x.id == $scope.active.id;
+                    });
+
+                    var next = getFiltered()[current + 1];
+                    if (next) {
+                        $scope.active = next;
+                        scrollTo();
+                    }
+                }
+            });
+        }
+
+        function unbindShortcuts() {
+            hotkeys.del('return');
+            hotkeys.del('up');
+            hotkeys.del('down');
+        }
+
+        function scrollTo() {
+            document.getElementById('e-'+$scope.active.id).scrollIntoViewIfNeeded();
+        }
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalCreateEntryController', function($scope, $modalInstance, Api, project_id) {
+        $scope.entry = {
+            project_id: project_id
+        };
+
+        $scope.ok = function () {
+            Api.entry.save($scope.entry,
+                function(response) {
+                    $modalInstance.close(response);
+                }
+            );
+        };
+
+        $scope.generate = function() {
+            $scope.entry.password = Password.generate(16);
+        };
+    });
+
+})();
+
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalGetPasswordController', function($scope, $modalInstance, password, entry) {
+        $scope.password = password;
+        $scope.entry = entry;
+
+        $scope.shown = false;
+
+        $scope.ok = function () {
+            $modalInstance.close();
+        };
+
+        $scope.show = function() {
+            $scope.shown = true;
+        };
+
+        $scope.hide = function() {
+            $scope.shown = false;
+        };
+
+        $scope.cancel = function() {
+            $modalInstance.dismiss('cancel');
+        };
+
+        $scope.download = function() {
+            var a = document.createElement('a');
+            a.href = 'data:application/octet-stream;charset=utf-8,' + encodeURI($scope.password.password);
+            a.target = '_blank';
+            a.download = $scope.entry.username ? $scope.entry.username : $scope.entry.id;
+            document.body.appendChild(a);
+            a.click();
+            a.parentNode.removeChild(a);
+        }
+    });
+
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalShareController', shareController);
+
+    function shareController($scope, Api, users, access, entry, teams, entryTeams) {
+        $scope.users = users;
+        $scope.access = access;
+        $scope.entry = entry;
+        $scope.teams = teams;
+        $scope.entryTeams = entryTeams;
+
+        $scope.share = {
+            user: 0,
+            team: 0
+        };
+
+        $scope.users.$promise.then(function() {
+            $scope.share.user = $scope.users[0] ? $scope.users[0].id : 0;
+        });
+
+        $scope.teams.$promise.then(function() {
+            $scope.share.team = $scope.teams[0] ? $scope.teams[0].id : 0;
+        });
+
+        $scope.shareUser = function() {
+            Api.share.save({
+                user_id: $scope.share.user,
+                id: $scope.entry.id
+            }, function(response) {
+                $scope.access.push(response);
+            });
+        };
+
+        $scope.shareTeam = function() {
+            Api.entryTeams.save({
+                team_id: $scope.share.team,
+                id: $scope.entry.id
+            }, function(response) {
+                $scope.entryTeams.push(response);
+            });
+        };
+
+        $scope.revokeUser = function(accessId) {
+            Api.share.delete({
+                id: accessId
+            }, function() {
+                $scope.access.splice($scope.access.map(function(i) {return i.id;}).indexOf(accessId), 1);
+            });
+        };
+
+        $scope.revokeTeam = function(accessId) {
+            Api.entryTeams.delete({
+                id: accessId
+            }, function() {
+                $scope.entryTeams.splice($scope.entryTeams.map(function(i) {return i.id;}).indexOf(accessId), 1);
+            });
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalTagController', ctrl);
+
+    function ctrl($scope, Api, entry, tags) {
+        $scope.tags = tags;
+        $scope.entry = entry;
+
+        $scope.tag = defaultTag();
+
+        $scope.createTag = function() {
+            Api.entryTags.save({color: $scope.tag.color, name: $scope.tag.name, entryId: entry.id}, function(res) {
+                $scope.entry.tags.push(res);
+                $scope.tags.push(res);
+                $scope.tag = defaultTag();
+            });
+        };
+
+        $scope.removeTag = function(tag) {
+            Api.entryTags.delete({id: tag.id}, function() {
+                var index = $scope.entry.tags.map(function (e) { return e.id; }).indexOf(tag.id);
+                $scope.entry.tags.splice(index, 1);
+
+                if (_.findWhere($scope.tags, {name: tag.name, entry_id: entry.id})) {
+                    var tagIndex = $scope.tags.map(function (e) { return e.name; }).indexOf(tag.name);
+                    $scope.tags.splice(tagIndex, 1);
+                }
+            });
+        };
+
+        $scope.addTag = function(tag) {
+            Api.entryTags.save({color: tag.color, name: tag.name, entryId: entry.id}, function(res) {
+                $scope.entry.tags.push(res);
+                $scope.tag = defaultTag();
+            });
+        };
+
+        $scope.availableTags = function() {
+            return _.filter($scope.tags, function(obj) {
+                return !_.findWhere($scope.entry.tags, {name: obj.name});
+            });
+        };
+
+        function defaultTag() {
+            return {color: '#dbdbdb', name: ''};
+        }
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalUpdateEntryController', ctrl);
+
+    function ctrl($scope, $modalInstance, Api, entry, GROUPS) {
+        $scope.entry = entry;
+        $scope.groups = GROUPS;
+
+        $scope.ok = function () {
+            Api.entry.update($scope.entry,
+                function(response) {
+                    $modalInstance.close(response);
+                }
+            );
+        };
+
+        $scope.generate = function() {
+            if (confirm('Replace password with random one?')) {
+                $scope.entry.password = Password.generate(16);
+            }
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
         .directive('copyPassword', copyPasswordDirective);
 
     function copyPasswordDirective() {
@@ -982,348 +1324,6 @@
                         angular.element(field).triggerHandler('change');
                     });
                 });
-            }
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('EntryController', controller);
-
-    function controller($scope, $filter, hotkeys, entries, project, active, $rootScope) {
-
-        $scope.entries = entries;
-        $scope.project = project;
-        $scope.active = active;
-        $scope.search = {};
-        $scope.tags = [];
-        $scope.setActive = setActive;
-        $scope.getFiltered = getFiltered;
-
-        $scope.entries.$promise.then(function(){
-            if (!$scope.active || !$scope.active.id && $scope.entries.length > 0) {
-                $scope.active = $scope.entries[0];
-            }
-        });
-
-        $scope.$watch("search", onFilterChanged, true);
-
-        $scope.$on('entry:create', onEntryCreate);
-        $scope.$on('entry:update', onEntryUpdate);
-        $scope.$on('entry:delete', onEntryDelete);
-
-        $scope.$on('$destroy', unbindShortcuts);
-        $scope.$on('modal:open', unbindShortcuts);
-        $scope.$on('modal:close', bindShortcuts);
-
-        $scope.$on('project:update', function(event, project) {
-            $scope.project = project;
-        });
-
-        bindShortcuts();
-
-        function onFilterChanged() {
-            var filtered = getFiltered();
-            var current = _.findIndex(filtered, function(x) {
-                return $scope.active && x.id == $scope.active.id;
-            });
-            if (current == -1 && filtered.length > 0) {
-                $scope.active = filtered[0];
-            }
-        }
-
-        function getFiltered() {
-            return $filter('filter')($scope.entries, { $: $scope.search.query });
-        }
-
-        function setActive(entry) {
-            $scope.active = entry;
-        }
-
-        function onEntryCreate(event, model) {
-            $scope.entries.push(model);
-        }
-
-        function onEntryUpdate(event, model) {
-            var index = getEntryIndex(model);
-
-            if (index >= 0) {
-                $scope.entries[index] = model;
-            }
-
-            setActive(model);
-        }
-
-        function onEntryDelete(event, model) {
-            var index = getEntryIndex(model);
-
-            if (index >= 0) {
-                $scope.entries.splice(index, 1);
-            }
-
-            setActive({});
-        }
-
-        function getEntryIndex(entry) {
-            return $scope.entries.map(function(e) {return parseInt(e.id)}).indexOf(parseInt(entry.id));
-        }
-
-        function bindShortcuts() {
-            hotkeys.add({
-                combo: 'return',
-                description: 'Download and copy password',
-                allowIn: ['input', 'select', 'textarea'],
-                callback: function() {
-                    $rootScope.$broadcast("PasswordRequest", $scope.active);
-                }
-            });
-
-            hotkeys.add({
-                combo: 'up',
-                description: 'Show project jump window',
-                allowIn: ['input', 'select', 'textarea'],
-                callback: function(event) {
-                    event.preventDefault();
-                    var current = _.findIndex(getFiltered(), function(x) {
-                        return x.id == $scope.active.id;
-                    });
-
-                    var previous = getFiltered()[current - 1];
-                    if (previous) {
-                        $scope.active = previous;
-                        scrollTo();
-                    } else {
-                        $rootScope.$broadcast("AppFocus");
-                    }
-                }
-            });
-
-            hotkeys.add({
-                combo: 'down',
-                description: 'Show project jump window',
-                allowIn: ['input', 'select', 'textarea'],
-                callback: function(event) {
-                    event.preventDefault();
-                    var current = _.findIndex(getFiltered(), function(x) {
-                        return x.id == $scope.active.id;
-                    });
-
-                    var next = getFiltered()[current + 1];
-                    if (next) {
-                        $scope.active = next;
-                        scrollTo();
-                    }
-                }
-            });
-        }
-
-        function unbindShortcuts() {
-            hotkeys.del('return');
-            hotkeys.del('up');
-            hotkeys.del('down');
-        }
-
-        function scrollTo() {
-            document.getElementById('e-'+$scope.active.id).scrollIntoViewIfNeeded();
-        }
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalCreateEntryController', function($scope, $modalInstance, Api, project_id) {
-        $scope.entry = {
-            project_id: project_id
-        };
-
-        $scope.ok = function () {
-            Api.entry.save($scope.entry,
-                function(response) {
-                    $modalInstance.close(response);
-                }
-            );
-        };
-
-        $scope.generate = function() {
-            $scope.entry.password = Password.generate(16);
-        };
-    });
-
-})();
-
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalGetPasswordController', function($scope, $modalInstance, password, entry) {
-        $scope.password = password;
-        $scope.entry = entry;
-
-        $scope.shown = false;
-
-        $scope.ok = function () {
-            $modalInstance.close();
-        };
-
-        $scope.show = function() {
-            $scope.shown = true;
-        };
-
-        $scope.hide = function() {
-            $scope.shown = false;
-        };
-
-        $scope.cancel = function() {
-            $modalInstance.dismiss('cancel');
-        };
-
-        $scope.download = function() {
-            var a = document.createElement('a');
-            a.href = 'data:application/octet-stream;charset=utf-8,' + encodeURI($scope.password.password);
-            a.target = '_blank';
-            a.download = $scope.entry.username ? $scope.entry.username : $scope.entry.id;
-            document.body.appendChild(a);
-            a.click();
-            a.parentNode.removeChild(a);
-        }
-    });
-
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalShareController', shareController);
-
-    function shareController($scope, Api, users, access, entry, teams, entryTeams) {
-        $scope.users = users;
-        $scope.access = access;
-        $scope.entry = entry;
-        $scope.teams = teams;
-        $scope.entryTeams = entryTeams;
-
-        $scope.share = {
-            user: 0,
-            team: 0
-        };
-
-        $scope.users.$promise.then(function() {
-            $scope.share.user = $scope.users[0] ? $scope.users[0].id : 0;
-        });
-
-        $scope.teams.$promise.then(function() {
-            $scope.share.team = $scope.teams[0] ? $scope.teams[0].id : 0;
-        });
-
-        $scope.shareUser = function() {
-            Api.share.save({
-                user_id: $scope.share.user,
-                id: $scope.entry.id
-            }, function(response) {
-                $scope.access.push(response);
-            });
-        };
-
-        $scope.shareTeam = function() {
-            Api.entryTeams.save({
-                team_id: $scope.share.team,
-                id: $scope.entry.id
-            }, function(response) {
-                $scope.entryTeams.push(response);
-            });
-        };
-
-        $scope.revokeUser = function(accessId) {
-            Api.share.delete({
-                id: accessId
-            }, function() {
-                $scope.access.splice($scope.access.map(function(i) {return i.id;}).indexOf(accessId), 1);
-            });
-        };
-
-        $scope.revokeTeam = function(accessId) {
-            Api.entryTeams.delete({
-                id: accessId
-            }, function() {
-                $scope.entryTeams.splice($scope.entryTeams.map(function(i) {return i.id;}).indexOf(accessId), 1);
-            });
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalTagController', ctrl);
-
-    function ctrl($scope, Api, entry, tags) {
-        $scope.tags = tags;
-        $scope.entry = entry;
-
-        $scope.tag = defaultTag();
-
-        $scope.createTag = function() {
-            Api.entryTags.save({color: $scope.tag.color, name: $scope.tag.name, entryId: entry.id}, function(res) {
-                $scope.entry.tags.push(res);
-                $scope.tags.push(res);
-                $scope.tag = defaultTag();
-            });
-        };
-
-        $scope.removeTag = function(tag) {
-            Api.entryTags.delete({id: tag.id}, function() {
-                var index = $scope.entry.tags.map(function (e) { return e.id; }).indexOf(tag.id);
-                $scope.entry.tags.splice(index, 1);
-
-                if (_.findWhere($scope.tags, {name: tag.name, entry_id: entry.id})) {
-                    var tagIndex = $scope.tags.map(function (e) { return e.name; }).indexOf(tag.name);
-                    $scope.tags.splice(tagIndex, 1);
-                }
-            });
-        };
-
-        $scope.addTag = function(tag) {
-            Api.entryTags.save({color: tag.color, name: tag.name, entryId: entry.id}, function(res) {
-                $scope.entry.tags.push(res);
-                $scope.tag = defaultTag();
-            });
-        };
-
-        $scope.availableTags = function() {
-            return _.filter($scope.tags, function(obj) {
-                return !_.findWhere($scope.entry.tags, {name: obj.name});
-            });
-        };
-
-        function defaultTag() {
-            return {color: '#dbdbdb', name: ''};
-        }
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalUpdateEntryController', ctrl);
-
-    function ctrl($scope, $modalInstance, Api, entry, GROUPS) {
-        $scope.entry = entry;
-        $scope.groups = GROUPS;
-
-        $scope.ok = function () {
-            Api.entry.update($scope.entry,
-                function(response) {
-                    $modalInstance.close(response);
-                }
-            );
-        };
-
-        $scope.generate = function() {
-            if (confirm('Replace password with random one?')) {
-                $scope.entry.password = Password.generate(16);
             }
         };
     }
@@ -2000,6 +2000,119 @@ var Password = {
 (function() {
     angular
         .module('xApp')
+        .controller('ModalCreateUserController', ctrl);
+
+    function ctrl($scope, $modalInstance, Api, user, GROUPS) {
+        $scope.user = user;
+        $scope.groups = GROUPS;
+
+        $scope.ok = function () {
+            Api.user.save($scope.user,
+                function(response) {
+                    $modalInstance.close(response);
+                }
+            );
+        };
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss('cancel');
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ModalUpdateUserController', ctrl);
+
+    function ctrl($scope, $modalInstance, Api, user, GROUPS) {
+        $scope.user = user;
+        $scope.groups = GROUPS;
+
+        $scope.ok = function () {
+            Api.user.update($scope.user,
+                function() {
+                    $modalInstance.close($scope.user);
+                }
+            );
+        };
+
+        $scope.cancel = function () {
+            $modalInstance.dismiss('cancel');
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ProfileController', ctrl);
+
+    function ctrl($scope, $modalInstance, $location, toaster, Api, AuthFactory) {
+        $scope.profile = {
+            old: '',
+            new: '',
+            repeat: ''
+        };
+
+        $scope.ok = function() {
+            Api.profile.save($scope.profile,
+                function() {
+                    toaster.pop('success', 'Password successfully changed!', "Please log in using new password.");
+                    $modalInstance.close();
+                    AuthFactory.logout();
+                    $location.path('/login');
+                }
+            );
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('UserListController', controller);
+
+    function controller($scope, $modal, users) {
+        $scope.users = users;
+
+        $scope.createUser = function() {
+            var modalInstance = $modal.open({
+                templateUrl: '/t/user/create.html',
+                controller: 'ModalCreateUserController',
+                resolve: {
+                    user: function() {
+                        return {$resolved: true};
+                    }
+                }
+            });
+
+            modalInstance.result.then(function (model) {
+                $scope.users.push(model);
+            });
+        };
+
+        $scope.updateUser = function(userId) {
+            var modalInstance = $modal.open({
+                templateUrl: '/t/user/create.html',
+                controller: 'ModalUpdateUserController',
+                resolve: {
+                    user: function(Api) {
+                        return Api.user.get({id: userId});
+                    }
+                }
+            });
+
+            modalInstance.result.then(function (model) {
+                $scope.users[$scope.users.map(function(e) {return e.id}).indexOf(userId)] = model;
+            });
+        };
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
         .controller('createTeamController', createTeamController);
 
     function createTeamController($scope, $modalInstance, Api) {
@@ -2170,118 +2283,5 @@ var Password = {
         function cancel() {
             $modalInstance.dismiss();
         }
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalCreateUserController', ctrl);
-
-    function ctrl($scope, $modalInstance, Api, user, GROUPS) {
-        $scope.user = user;
-        $scope.groups = GROUPS;
-
-        $scope.ok = function () {
-            Api.user.save($scope.user,
-                function(response) {
-                    $modalInstance.close(response);
-                }
-            );
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss('cancel');
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ModalUpdateUserController', ctrl);
-
-    function ctrl($scope, $modalInstance, Api, user, GROUPS) {
-        $scope.user = user;
-        $scope.groups = GROUPS;
-
-        $scope.ok = function () {
-            Api.user.update($scope.user,
-                function() {
-                    $modalInstance.close($scope.user);
-                }
-            );
-        };
-
-        $scope.cancel = function () {
-            $modalInstance.dismiss('cancel');
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ProfileController', ctrl);
-
-    function ctrl($scope, $modalInstance, $location, toaster, Api, AuthFactory) {
-        $scope.profile = {
-            old: '',
-            new: '',
-            repeat: ''
-        };
-
-        $scope.ok = function() {
-            Api.profile.save($scope.profile,
-                function() {
-                    toaster.pop('success', 'Password successfully changed!', "Please log in using new password.");
-                    $modalInstance.close();
-                    AuthFactory.logout();
-                    $location.path('/login');
-                }
-            );
-        };
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('UserListController', controller);
-
-    function controller($scope, $modal, users) {
-        $scope.users = users;
-
-        $scope.createUser = function() {
-            var modalInstance = $modal.open({
-                templateUrl: '/t/user/create.html',
-                controller: 'ModalCreateUserController',
-                resolve: {
-                    user: function() {
-                        return {$resolved: true};
-                    }
-                }
-            });
-
-            modalInstance.result.then(function (model) {
-                $scope.users.push(model);
-            });
-        };
-
-        $scope.updateUser = function(userId) {
-            var modalInstance = $modal.open({
-                templateUrl: '/t/user/create.html',
-                controller: 'ModalUpdateUserController',
-                resolve: {
-                    user: function(Api) {
-                        return Api.user.get({id: userId});
-                    }
-                }
-            });
-
-            modalInstance.result.then(function (model) {
-                $scope.users[$scope.users.map(function(e) {return e.id}).indexOf(userId)] = model;
-            });
-        };
     }
 })();

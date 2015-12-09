@@ -1579,19 +1579,6 @@ var Password = {
 (function() {
     angular
         .module('xApp')
-        .controller('HistoryController', function($scope, history) {
-            $scope.history = history;
-        })
-        .factory('HistoryFactory', function ($resource) {
-            return $resource("/api/history", {}, {
-                query: { method: 'GET', isArray: true }
-            })
-        });
-})();
-
-(function() {
-    angular
-        .module('xApp')
         .controller('HomeController', function($scope, recent, hotkeys, $rootScope) {
             $scope.recent = recent;
             $scope.active = {};
@@ -1678,6 +1665,19 @@ var Password = {
       vm.bodyClass = 'default';
     }
   }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('HistoryController', function($scope, history) {
+            $scope.history = history;
+        })
+        .factory('HistoryFactory', function ($resource) {
+            return $resource("/api/history", {}, {
+                query: { method: 'GET', isArray: true }
+            })
+        });
 })();
 
 (function() {

@@ -1592,6 +1592,97 @@ var Password = {
 (function() {
     angular
         .module('xApp')
+        .controller('HomeController', function($scope, recent, hotkeys, $rootScope) {
+            $scope.recent = recent;
+            $scope.active = {};
+            $scope.setActive = setActive;
+            $scope.$on('$destroy', onDestroy);
+
+            hotkeys.add({
+                combo: 'return',
+                description: 'Download and copy password',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event, hotkey) {
+                    $rootScope.$broadcast("PasswordRequest", $scope.active);
+                }
+            });
+
+            hotkeys.add({
+                combo: 'up',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event, hotkey) {
+                    event.preventDefault();
+                    var current = _.findIndex($scope.recent, function(x) {
+                        return x.id == $scope.active.id;
+                    });
+
+                    var previous = $scope.recent[current - 1];
+                    if (previous) {
+                        $scope.active = previous;
+                    }
+                }
+            });
+
+            hotkeys.add({
+                combo: 'down',
+                description: 'Show project jump window',
+                allowIn: ['input', 'select', 'textarea'],
+                callback: function(event, hotkey) {
+                    event.preventDefault();
+                    var current = _.findIndex($scope.recent, function(x) {
+                        return x.id == $scope.active.id;
+                    });
+
+                    var next = $scope.recent[current + 1];
+                    if (next) {
+                        $scope.active = next;
+                    }
+                }
+            });
+
+            function setActive(entry) {
+                $scope.active = entry;
+            }
+
+            function onDestroy() {
+                hotkeys.del('return');
+                hotkeys.del('up');
+                hotkeys.del('down');
+            }
+        })
+        .factory('RecentFactory', function ($resource) {
+            return $resource("/api/recent", {}, {
+                query: { method: 'GET', isArray: true }
+            });
+        });
+})();
+
+(function() {
+  angular
+    .module('xApp')
+    .controller('VaultController', ctrl);
+
+  function ctrl($scope) {
+    var vm = this;
+    vm.bodyClass = 'default';
+
+    $scope.$on('$stateChangeSuccess', onRouteChange);
+
+    function onRouteChange(event, toState, toParams, fromState, fromParams) {
+      if (angular.isDefined(toState.data) && angular.isDefined(toState.data.bodyClass)) {
+        vm.bodyClass = toState.data.bodyClass;
+        return;
+      }
+
+      vm.bodyClass = 'default';
+    }
+  }
+})();
+
+(function() {
+    angular
+        .module('xApp')
         .controller('ModalCreateProjectController', ctrl);
 
     function ctrl($scope, $modalInstance, $state, Api, toaster) {
@@ -1870,136 +1961,6 @@ var Password = {
 (function() {
     angular
         .module('xApp')
-        .controller('HomeController', function($scope, recent, hotkeys, $rootScope) {
-            $scope.recent = recent;
-            $scope.active = {};
-            $scope.setActive = setActive;
-            $scope.$on('$destroy', onDestroy);
-
-            hotkeys.add({
-                combo: 'return',
-                description: 'Download and copy password',
-                allowIn: ['input', 'select', 'textarea'],
-                callback: function(event, hotkey) {
-                    $rootScope.$broadcast("PasswordRequest", $scope.active);
-                }
-            });
-
-            hotkeys.add({
-                combo: 'up',
-                description: 'Show project jump window',
-                allowIn: ['input', 'select', 'textarea'],
-                callback: function(event, hotkey) {
-                    event.preventDefault();
-                    var current = _.findIndex($scope.recent, function(x) {
-                        return x.id == $scope.active.id;
-                    });
-
-                    var previous = $scope.recent[current - 1];
-                    if (previous) {
-                        $scope.active = previous;
-                    }
-                }
-            });
-
-            hotkeys.add({
-                combo: 'down',
-                description: 'Show project jump window',
-                allowIn: ['input', 'select', 'textarea'],
-                callback: function(event, hotkey) {
-                    event.preventDefault();
-                    var current = _.findIndex($scope.recent, function(x) {
-                        return x.id == $scope.active.id;
-                    });
-
-                    var next = $scope.recent[current + 1];
-                    if (next) {
-                        $scope.active = next;
-                    }
-                }
-            });
-
-            function setActive(entry) {
-                $scope.active = entry;
-            }
-
-            function onDestroy() {
-                hotkeys.del('return');
-                hotkeys.del('up');
-                hotkeys.del('down');
-            }
-        })
-        .factory('RecentFactory', function ($resource) {
-            return $resource("/api/recent", {}, {
-                query: { method: 'GET', isArray: true }
-            });
-        });
-})();
-
-(function() {
-  angular
-    .module('xApp')
-    .controller('VaultController', ctrl);
-
-  function ctrl($scope) {
-    var vm = this;
-    vm.bodyClass = 'default';
-
-    $scope.$on('$stateChangeSuccess', onRouteChange);
-
-    function onRouteChange(event, toState, toParams, fromState, fromParams) {
-      if (angular.isDefined(toState.data) && angular.isDefined(toState.data.bodyClass)) {
-        vm.bodyClass = toState.data.bodyClass;
-        return;
-      }
-
-      vm.bodyClass = 'default';
-    }
-  }
-})();
-
-(function() {
-    angular
-        .module('xApp')
-        .controller('ProjectTeamController', teamController);
-
-    function teamController($scope, Api, teams, project, access) {
-        $scope.teams = teams;
-        $scope.access = access;
-        $scope.project = project;
-
-        $scope.canAccess = function(team) {
-            return getAccessIndexForUserId(team.id) != -1;
-        };
-
-        $scope.grant = function(team) {
-            Api.projectTeams.save({
-                team_id: team.id,
-                project_id: $scope.project.id
-            }, function (response) {
-                $scope.access.push(response);
-            });
-        };
-
-        $scope.revoke = function(team) {
-            var accessIndex = getAccessIndexForUserId(team.id);
-
-            Api.projectTeams.delete({
-                id: $scope.access[accessIndex].id
-            }, function() {
-                $scope.access.splice(accessIndex, 1);
-            });
-        };
-
-        function getAccessIndexForUserId(teamId) {
-            return $scope.access.map(function (e) { return e.team_id; }).indexOf(teamId);
-        }
-    }
-})();
-
-(function() {
-    angular
-        .module('xApp')
         .controller('createTeamController', createTeamController);
 
     function createTeamController($scope, $modalInstance, Api) {
@@ -2169,6 +2130,45 @@ var Password = {
 
         function cancel() {
             $modalInstance.dismiss();
+        }
+    }
+})();
+
+(function() {
+    angular
+        .module('xApp')
+        .controller('ProjectTeamController', teamController);
+
+    function teamController($scope, Api, teams, project, access) {
+        $scope.teams = teams;
+        $scope.access = access;
+        $scope.project = project;
+
+        $scope.canAccess = function(team) {
+            return getAccessIndexForUserId(team.id) != -1;
+        };
+
+        $scope.grant = function(team) {
+            Api.projectTeams.save({
+                team_id: team.id,
+                project_id: $scope.project.id
+            }, function (response) {
+                $scope.access.push(response);
+            });
+        };
+
+        $scope.revoke = function(team) {
+            var accessIndex = getAccessIndexForUserId(team.id);
+
+            Api.projectTeams.delete({
+                id: $scope.access[accessIndex].id
+            }, function() {
+                $scope.access.splice(accessIndex, 1);
+            });
+        };
+
+        function getAccessIndexForUserId(teamId) {
+            return $scope.access.map(function (e) { return e.team_id; }).indexOf(teamId);
         }
     }
 })();

@@ -416,7 +416,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
 
     /*
      * AngularJS Toaster
-     * Version: 0.4.16
+     * Version: 0.4.15
      *
      * Copyright 2013-2015 Jiri Kavulak.
      * All Rights Reserved.
@@ -455,7 +455,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                 success: 'toast-success',
                 warning: 'toast-warning'
             },
-            'body-output-type': '', // Options: '', 'trustedHtml', 'template', 'templateWithData', 'directive'
+            'body-output-type': '', // Options: '', 'trustedHtml', 'template', 'templateWithData'
             'body-template': 'toasterBodyTmpl.html',
             'icon-class': 'toast-info',
             'position-class': 'toast-top-right', // Options (see CSS):
@@ -467,10 +467,10 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
             'prevent-duplicates': false,
             'mouseover-timer-stop': true // stop timeout on mouseover and restart timer on mouseout
         }
-        ).service(
+    ).service(
         'toaster', [
             '$rootScope', 'toasterConfig', function ($rootScope, toasterConfig) {
-                this.pop = function (type, title, body, timeout, bodyOutputType, clickHandler, toasterId, showCloseButton, toastId, onHideCallback, directiveData) {
+                this.pop = function (type, title, body, timeout, bodyOutputType, clickHandler, toasterId, showCloseButton, toastId, onHideCallback) {
                     if (angular.isObject(type)) {
                         var params = type; // Enable named parameters as pop argument
                         this.toast = {
@@ -482,8 +482,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                             clickHandler: params.clickHandler,
                             showCloseButton: params.showCloseButton,
                             uid: params.toastId,
-                            onHideCallback: params.onHideCallback,
-                            directiveData: params.directiveData
+                            onHideCallback: params.onHideCallback
                         };
                         toastId = params.toastId;
                         toasterId = params.toasterId;
@@ -497,8 +496,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                             clickHandler: clickHandler,
                             showCloseButton: showCloseButton,
                             uid: toastId,
-                            onHideCallback: onHideCallback,
-                            directiveData: directiveData
+                            onHideCallback: onHideCallback
                         };
                     }
                     $rootScope.$emit('toaster-newToast', toasterId, toastId);
@@ -510,32 +508,29 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
 
                 // Create one method per icon class, to allow to call toaster.info() and similar
                 for (var type in toasterConfig['icon-classes']) {
-                    this[type] = createTypeMethod(type);
-                }
-
-                function createTypeMethod(toasterType) {
-                    return function (title, body, timeout, bodyOutputType, clickHandler, toasterId, showCloseButton, toastId, onHideCallback, directiveData) {
-                        if (angular.isString(title)) {
-                            this.pop(
-                                toasterType,
-                                title,
-                                body,
-                                timeout,
-                                bodyOutputType,
-                                clickHandler,
-                                toasterId,
-                                showCloseButton,
-                                toastId,
-                                onHideCallback,
-                                directiveData
+                    this[type] = (function (toasterType) {
+                        return function (title, body, timeout, bodyOutputType, clickHandler, toasterId, showCloseButton, toastId,onHideCallback) {
+                            if (angular.isString(title)) {
+                                this.pop(
+                                    toasterType,
+                                    title,
+                                    body,
+                                    timeout,
+                                    bodyOutputType,
+                                    clickHandler,
+                                    toasterId,
+                                    showCloseButton,
+                                    toastId,
+                                    onHideCallback
                                 );
-                        } else { // 'title' is actually an object with options
-                            this.pop(angular.extend(title, { type: toasterType }));
-                        }
-                    };
+                            } else { // 'title' is actually an object with options
+                                this.pop(angular.extend(title, { type: toasterType }));
+                            }
+                        };
+                    })(type);
                 }
             }]
-        ).factory(
+    ).factory(
         'toasterEventRegistry', [
             '$rootScope', function ($rootScope) {
                 var deregisterNewToast = null, deregisterClearToasts = null, newToastEventSubscribers = [], clearToastsEventSubscribers = [], toasterFactory;
@@ -549,7 +544,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                         newToastEventSubscribers[i](event, toasterId, toastId);
                                     }
                                 }
-                                );
+                            );
                         }
 
                         if (!deregisterClearToasts) {
@@ -559,7 +554,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                         clearToastsEventSubscribers[i](event, toasterId, toastId);
                                     }
                                 }
-                                );
+                            );
                         }
                     },
 
@@ -600,36 +595,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                     unsubscribeToClearToastsEvent: toasterFactory.unsubscribeToClearToastsEvent
                 };
             }]
-        )
-        .directive('directiveTemplate', ['$compile', '$injector', function($compile, $injector) {
-            return {
-                restrict: 'A',
-                scope: {
-                    directiveName: '@directiveName',
-                    directiveData: '@directiveData'
-                },
-                replace: true,   
-                link: function (scope, elm, attrs) {
-                    scope.$watch('directiveName', function (directiveName) {
-                        if (angular.isUndefined(directiveName) || directiveName.length <= 0)
-                            throw new Error('A valid directive name must be provided via the toast body argument when using bodyOutputType: directive');
-                        
-                        var directiveExists = $injector.has(attrs.$normalize(directiveName) + 'Directive');
-                        
-                        if (!directiveExists)
-                            throw new Error(directiveName + ' could not be found.');
-                        
-                        if (scope.directiveData)
-                            scope.directiveData = angular.fromJson(scope.directiveData);
-                        
-                        var template = $compile('<div ' + directiveName + '></div>')(scope);
-
-                        elm.append(template);
-                    });
-                }
-            }
-        }])
-        .directive(
+    ).directive(
         'toasterContainer', [
             '$parse', '$rootScope', '$interval', '$sce', 'toasterConfig', 'toaster', 'toasterEventRegistry',
             function ($parse, $rootScope, $interval, $sce, toasterConfig, toaster, toasterEventRegistry) {
@@ -659,14 +625,14 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                 toasterEventRegistry.unsubscribeToNewToastEvent(scope._onNewToast);
                                 toasterEventRegistry.unsubscribeToClearToastsEvent(scope._onClearToasts);
                             }
-                            );
+                        );
 
                         function setTimeout(toast, time) {
                             toast.timeoutPromise = $interval(
                                 function () {
                                     scope.removeToast(toast.id);
                                 }, time, 1
-                                );
+                            );
                         }
 
                         scope.configureTimer = function (toast) {
@@ -745,9 +711,6 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                     toast.bodyTemplate = templateWithData.template;
                                     toast.data = templateWithData.data;
                                     break;
-                                case 'directive':
-                                    toast.html = toast.body;
-                                    break;
                             }
 
                             scope.configureTimer(toast);
@@ -765,7 +728,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                         }
 
                         scope.removeToast = function (id) {
-                            var i, len;
+                            var i, len, toast;
                             for (i = 0, len = scope.toasters.length; i < len; i++) {
                                 if (scope.toasters[i].id === id) {
                                     removeToast(i);
@@ -781,7 +744,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                     $interval.cancel(toast.timeoutPromise);
                                 }
                                 scope.toasters.splice(toastIndex, 1);
-
+                                
                                 if (angular.isFunction(toast.onHideCallback)) {
                                     toast.onHideCallback();
                                 }
@@ -803,7 +766,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                         scope.toasters = [];
 
                         function isUndefinedOrNull(val) {
-                            return angular.isUndefined(val) || val === null;
+                            return angular.isUndefined(val) || val === null
                         }
 
                         scope._onNewToast = function (event, toasterId, toastId) {
@@ -868,23 +831,10 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                 }
                             };
                         }],
-                    template: 
-                        '<div id="toast-container" ng-class="[config.position, config.animation]">' + 
-                            '<div ng-repeat="toaster in toasters" class="toast" ng-class="toaster.type" ng-click="click(toaster)" ng-mouseover="stopTimer(toaster)" ng-mouseout="restartTimer(toaster)">' + 
-                                '<button type="button" class="toast-close-button" ng-show="toaster.showCloseButton" ng-click="click(toaster, true)">&times;</button>' + 
-                                '<div ng-class="config.title">{{toaster.title}}</div>' + 
-                                '<div ng-class="config.message" ng-switch on="toaster.bodyOutputType">' + 
-                                    '<div ng-switch-when="trustedHtml" ng-bind-html="toaster.html"></div>' + 
-                                    '<div ng-switch-when="template"><div ng-include="toaster.bodyTemplate"></div></div>' + 
-                                    '<div ng-switch-when="templateWithData"><div ng-include="toaster.bodyTemplate"></div></div>' +
-                                    '<div ng-switch-when="directive"><div directive-template directive-name="{{toaster.html}}" directive-data="{{toaster.directiveData}}"></div></div>' + 
-                                    '<div ng-switch-default >{{toaster.body}}</div>' + 
-                                '</div>' + 
-                            '</div>' + 
-                        '</div>'
+                    template: '<div id="toast-container" ng-class="[config.position, config.animation]">' + '<div ng-repeat="toaster in toasters" class="toast" ng-class="toaster.type" ng-click="click(toaster)" ng-mouseover="stopTimer(toaster)" ng-mouseout="restartTimer(toaster)">' + '<button type="button" class="toast-close-button" ng-show="toaster.showCloseButton" ng-click="click(toaster, true)">&times;</button>' + '<div ng-class="config.title">{{toaster.title}}</div>' + '<div ng-class="config.message" ng-switch on="toaster.bodyOutputType">' + '<div ng-switch-when="trustedHtml" ng-bind-html="toaster.html"></div>' + '<div ng-switch-when="template"><div ng-include="toaster.bodyTemplate"></div></div>' + '<div ng-switch-when="templateWithData"><div ng-include="toaster.bodyTemplate"></div></div>' + '<div ng-switch-default >{{toaster.body}}</div>' + '</div>' + '</div>' + '</div>'
                 };
             }]
-        );
+    );
 })(window, document);
 /**
  * State-based routing for AngularJS
@@ -999,7 +949,7 @@ Un[J]=Un[X]=Un[H]=Un[Q]=Un[nn]=Un[tn]=Un[rn]=Un[en]=Un[un]=true,Un[z]=Un[B]=Un[G
 "\xe0":"a","\xe1":"a","\xe2":"a","\xe3":"a","\xe4":"a","\xe5":"a","\xc7":"C","\xe7":"c","\xd0":"D","\xf0":"d","\xc8":"E","\xc9":"E","\xca":"E","\xcb":"E","\xe8":"e","\xe9":"e","\xea":"e","\xeb":"e","\xcc":"I","\xcd":"I","\xce":"I","\xcf":"I","\xec":"i","\xed":"i","\xee":"i","\xef":"i","\xd1":"N","\xf1":"n","\xd2":"O","\xd3":"O","\xd4":"O","\xd5":"O","\xd6":"O","\xd8":"O","\xf2":"o","\xf3":"o","\xf4":"o","\xf5":"o","\xf6":"o","\xf8":"o","\xd9":"U","\xda":"U","\xdb":"U","\xdc":"U","\xf9":"u","\xfa":"u",
 "\xfb":"u","\xfc":"u","\xdd":"Y","\xfd":"y","\xff":"y","\xc6":"Ae","\xe6":"ae","\xde":"Th","\xfe":"th","\xdf":"ss"},Ln={"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;","`":"&#96;"},zn={"&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"',"&#39;":"'","&#96;":"`"},Bn={"function":true,object:true},Mn={"\\":"\\","'":"'","\n":"n","\r":"r","\u2028":"u2028","\u2029":"u2029"},Pn=Bn[typeof exports]&&exports&&!exports.nodeType&&exports,qn=Bn[typeof module]&&module&&!module.nodeType&&module,Dn=Bn[typeof self]&&self&&self.Object&&self,Kn=Bn[typeof window]&&window&&window.Object&&window,Vn=qn&&qn.exports===Pn&&Pn,Yn=Pn&&qn&&typeof global=="object"&&global&&global.Object&&global||Kn!==(this&&this.window)&&Kn||Dn||this,Zn=d();
 typeof define=="function"&&typeof define.amd=="object"&&define.amd?(Yn._=Zn, define(function(){return Zn})):Pn&&qn?Vn?(qn.exports=Zn)._=Zn:Pn._=Zn:Yn._=Zn}).call(this);
-angular.module("colorpicker.module",[]).factory("Helper",function(){"use strict";return{closestSlider:function(e){var o=e.matches||e.webkitMatchesSelector||e.mozMatchesSelector||e.msMatchesSelector;return o.bind(e)("I")?e.parentNode:e},getOffset:function(e,o){for(var t=0,n=0,r=e.getBoundingClientRect();e&&!isNaN(e.offsetLeft)&&!isNaN(e.offsetTop);)o||"BODY"!==e.tagName?(t+=e.scrollLeft,n+=e.scrollTop):(t+=document.documentElement.scrollLeft||e.scrollLeft,n+=document.documentElement.scrollTop||e.scrollTop),e=e.offsetParent;return{top:r.top+window.pageYOffset,left:r.left+window.pageXOffset,scrollX:t,scrollY:n}},stringParsers:[{re:/rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*(\d+(?:\.\d+)?)\s*)?\)/,parse:function(e){return[e[1],e[2],e[3],e[4]]}},{re:/rgba?\(\s*(\d+(?:\.\d+)?)\%\s*,\s*(\d+(?:\.\d+)?)\%\s*,\s*(\d+(?:\.\d+)?)\%\s*(?:,\s*(\d+(?:\.\d+)?)\s*)?\)/,parse:function(e){return[2.55*e[1],2.55*e[2],2.55*e[3],e[4]]}},{re:/#([a-fA-F0-9]{2})([a-fA-F0-9]{2})([a-fA-F0-9]{2})/,parse:function(e){return[parseInt(e[1],16),parseInt(e[2],16),parseInt(e[3],16)]}},{re:/#([a-fA-F0-9])([a-fA-F0-9])([a-fA-F0-9])/,parse:function(e){return[parseInt(e[1]+e[1],16),parseInt(e[2]+e[2],16),parseInt(e[3]+e[3],16)]}}]}}).factory("Color",["Helper",function(e){"use strict";return{value:{h:1,s:1,b:1,a:1},rgb:function(){var e=this.toRGB();return"rgb("+e.r+","+e.g+","+e.b+")"},rgba:function(){var e=this.toRGB();return"rgba("+e.r+","+e.g+","+e.b+","+e.a+")"},hex:function(){return this.toHex()},RGBtoHSB:function(e,o,t,n){e/=255,o/=255,t/=255;var r,i,l,c;return l=Math.max(e,o,t),c=l-Math.min(e,o,t),r=0===c?null:l===e?(o-t)/c:l===o?(t-e)/c+2:(e-o)/c+4,r=(r+360)%6*60/360,i=0===c?0:c/l,{h:r||1,s:i,b:l,a:n||1}},setColor:function(o){o=o.toLowerCase();for(var t in e.stringParsers)if(e.stringParsers.hasOwnProperty(t)){var n=e.stringParsers[t],r=n.re.exec(o),i=r&&n.parse(r);if(i)return this.value=this.RGBtoHSB.apply(null,i),!1}},setHue:function(e){this.value.h=1-e},setSaturation:function(e){this.value.s=e},setLightness:function(e){this.value.b=1-e},setAlpha:function(e){this.value.a=parseInt(100*(1-e),10)/100},toRGB:function(e,o,t,n){e||(e=this.value.h,o=this.value.s,t=this.value.b),e*=360;var r,i,l,c,s;return e=e%360/60,s=t*o,c=s*(1-Math.abs(e%2-1)),r=i=l=t-s,e=~~e,r+=[s,c,0,0,c,s][e],i+=[c,s,s,c,0,0][e],l+=[0,0,c,s,s,c][e],{r:Math.round(255*r),g:Math.round(255*i),b:Math.round(255*l),a:n||this.value.a}},toHex:function(e,o,t,n){var r=this.toRGB(e,o,t,n);return"#"+(1<<24|parseInt(r.r,10)<<16|parseInt(r.g,10)<<8|parseInt(r.b,10)).toString(16).substr(1)}}}]).factory("Slider",["Helper",function(e){"use strict";var o={maxLeft:0,maxTop:0,callLeft:null,callTop:null,knob:{top:0,left:0}},t={};return{getSlider:function(){return o},getLeftPosition:function(e){return Math.max(0,Math.min(o.maxLeft,o.left+((e.pageX||t.left)-t.left)))},getTopPosition:function(e){return Math.max(0,Math.min(o.maxTop,o.top+((e.pageY||t.top)-t.top)))},setSlider:function(n,r){var i=e.closestSlider(n.target),l=e.getOffset(i,r),c=i.getBoundingClientRect(),s=n.clientX-c.left,a=n.clientY-c.top;o.knob=i.children[0].style,o.left=n.pageX-l.left-window.pageXOffset+l.scrollX,o.top=n.pageY-l.top-window.pageYOffset+l.scrollY,t={left:n.pageX-(s-o.left),top:n.pageY-(a-o.top)}},setSaturation:function(e,t){o={maxLeft:100,maxTop:100,callLeft:"setSaturation",callTop:"setLightness"},this.setSlider(e,t)},setHue:function(e,t){o={maxLeft:0,maxTop:100,callLeft:!1,callTop:"setHue"},this.setSlider(e,t)},setAlpha:function(e,t){o={maxLeft:0,maxTop:100,callLeft:!1,callTop:"setAlpha"},this.setSlider(e,t)},setKnob:function(e,t){o.knob.top=e+"px",o.knob.left=t+"px"}}}]).directive("colorpicker",["$document","$compile","Color","Slider","Helper",function(e,o,t,n,r){"use strict";return{require:"?ngModel",restrict:"A",link:function(i,l,c,s){var a,u=c.colorpicker?c.colorpicker:"hex",p=angular.isDefined(c.colorpickerPosition)?c.colorpickerPosition:"bottom",f=angular.isDefined(c.colorpickerInline)?c.colorpickerInline:!1,d=angular.isDefined(c.colorpickerFixedPosition)?c.colorpickerFixedPosition:!1,h=angular.isDefined(c.colorpickerParent)?l.parent():angular.element(document.body),g=angular.isDefined(c.colorpickerWithInput)?c.colorpickerWithInput:!1,k=g?'<input type="text" name="colorpicker-input" spellcheck="false">':"",v=f?"":'<button type="button" class="close close-colorpicker">&times;</button>',m='<div class="colorpicker dropdown"><div class="dropdown-menu"><colorpicker-saturation><i></i></colorpicker-saturation><colorpicker-hue><i></i></colorpicker-hue><colorpicker-alpha><i></i></colorpicker-alpha><colorpicker-preview></colorpicker-preview>'+k+v+"</div></div>",b=angular.element(m),x=t,w=b.find("colorpicker-hue"),S=b.find("colorpicker-saturation"),I=b.find("colorpicker-preview"),C=b.find("i");if(o(b)(i),g){var L=b.find("input");L.on("mousedown",function(e){e.stopPropagation()}).on("keyup",function(){var e=this.value;l.val(e),s&&s.$modelValue!==e&&(i.$apply(s.$setViewValue(e)),O(!0))})}var $=function(){e.on("mousemove",H),e.on("mouseup",T)};"rgba"===u&&(b.addClass("alpha"),a=b.find("colorpicker-alpha"),a.on("click",function(e){n.setAlpha(e,d),H(e)}).on("mousedown",function(e){n.setAlpha(e,d),$()}).on("mouseup",function(e){B("colorpicker-selected-alpha")})),w.on("click",function(e){n.setHue(e,d),H(e)}).on("mousedown",function(e){n.setHue(e,d),$()}).on("mouseup",function(e){B("colorpicker-selected-hue")}),S.on("click",function(e){n.setSaturation(e,d),H(e),angular.isDefined(c.colorpickerCloseOnSelect)&&D()}).on("mousedown",function(e){n.setSaturation(e,d),$()}).on("mouseup",function(e){B("colorpicker-selected-saturation")}),d&&b.addClass("colorpicker-fixed-position"),b.addClass("colorpicker-position-"+p),"true"===f&&b.addClass("colorpicker-inline"),h.append(b),s&&(s.$render=function(){l.val(s.$viewValue)}),l.on("blur keyup change",function(){O()}),l.on("$destroy",function(){b.remove()});var P=function(){try{I.css("backgroundColor",x[u]())}catch(e){I.css("backgroundColor",x.toHex())}S.css("backgroundColor",x.toHex(x.value.h,1,1,1)),"rgba"===u&&(a.css.backgroundColor=x.toHex())},H=function(e){var o=n.getLeftPosition(e),t=n.getTopPosition(e),r=n.getSlider();n.setKnob(t,o),r.callLeft&&x[r.callLeft].call(x,o/100),r.callTop&&x[r.callTop].call(x,t/100),P();var c=x[u]();return l.val(c),s&&i.$apply(s.$setViewValue(c)),g&&L.val(c),!1},T=function(){B("colorpicker-selected"),e.off("mousemove",H),e.off("mouseup",T)},O=function(e){x.setColor(l.val()),g&&!e&&L.val(l.val()),C.eq(0).css({left:100*x.value.s+"px",top:100-100*x.value.b+"px"}),C.eq(1).css("top",100*(1-x.value.h)+"px"),C.eq(2).css("top",100*(1-x.value.a)+"px"),P()},y=function(){var e,o=r.getOffset(l[0]);return angular.isDefined(c.colorpickerParent)&&(o.left=0,o.top=0),"top"===p?e={top:o.top-147,left:o.left}:"right"===p?e={top:o.top,left:o.left+126}:"bottom"===p?e={top:o.top+l[0].offsetHeight+2,left:o.left}:"left"===p&&(e={top:o.top,left:o.left-150}),{top:e.top+"px",left:e.left+"px"}},M=function(){D()},A=function(){b.hasClass("colorpicker-visible")||(O(),b.addClass("colorpicker-visible").css(y()),B("colorpicker-shown"),f===!1&&e.on("mousedown",M),c.colorpickerIsOpen&&(i[c.colorpickerIsOpen]=!0,i.$$phase||i.$digest()))};f===!1?l.on("click",A):A(),b.on("mousedown",function(e){e.stopPropagation(),e.preventDefault()});var B=function(e){s&&i.$emit(e,{name:c.ngModel,value:s.$modelValue})},D=function(){b.hasClass("colorpicker-visible")&&(b.removeClass("colorpicker-visible"),B("colorpicker-closed"),e.off("mousedown",M),c.colorpickerIsOpen&&(i[c.colorpickerIsOpen]=!1,i.$$phase||i.$digest()))};b.find("button").on("click",function(){D()}),c.colorpickerIsOpen&&i.$watch(c.colorpickerIsOpen,function(e){e===!0?A():e===!1&&D()})}}}]);
+angular.module("colorpicker.module",[]).factory("Helper",function(){"use strict";return{closestSlider:function(e){var o=e.matches||e.webkitMatchesSelector||e.mozMatchesSelector||e.msMatchesSelector;return o.bind(e)("I")?e.parentNode:e},getOffset:function(e,o){for(var t=0,r=0,n=0,i=0;e&&!isNaN(e.offsetLeft)&&!isNaN(e.offsetTop);)t+=e.offsetLeft,r+=e.offsetTop,o||"BODY"!==e.tagName?(n+=e.scrollLeft,i+=e.scrollTop):(n+=document.documentElement.scrollLeft||e.scrollLeft,i+=document.documentElement.scrollTop||e.scrollTop),e=e.offsetParent;return{top:r,left:t,scrollX:n,scrollY:i}},stringParsers:[{re:/rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*(\d+(?:\.\d+)?)\s*)?\)/,parse:function(e){return[e[1],e[2],e[3],e[4]]}},{re:/rgba?\(\s*(\d+(?:\.\d+)?)\%\s*,\s*(\d+(?:\.\d+)?)\%\s*,\s*(\d+(?:\.\d+)?)\%\s*(?:,\s*(\d+(?:\.\d+)?)\s*)?\)/,parse:function(e){return[2.55*e[1],2.55*e[2],2.55*e[3],e[4]]}},{re:/#([a-fA-F0-9]{2})([a-fA-F0-9]{2})([a-fA-F0-9]{2})/,parse:function(e){return[parseInt(e[1],16),parseInt(e[2],16),parseInt(e[3],16)]}},{re:/#([a-fA-F0-9])([a-fA-F0-9])([a-fA-F0-9])/,parse:function(e){return[parseInt(e[1]+e[1],16),parseInt(e[2]+e[2],16),parseInt(e[3]+e[3],16)]}}]}}).factory("Color",["Helper",function(e){"use strict";return{value:{h:1,s:1,b:1,a:1},rgb:function(){var e=this.toRGB();return"rgb("+e.r+","+e.g+","+e.b+")"},rgba:function(){var e=this.toRGB();return"rgba("+e.r+","+e.g+","+e.b+","+e.a+")"},hex:function(){return this.toHex()},RGBtoHSB:function(e,o,t,r){e/=255,o/=255,t/=255;var n,i,l,c;return l=Math.max(e,o,t),c=l-Math.min(e,o,t),n=0===c?null:l===e?(o-t)/c:l===o?(t-e)/c+2:(e-o)/c+4,n=(n+360)%6*60/360,i=0===c?0:c/l,{h:n||1,s:i,b:l,a:r||1}},setColor:function(o){o=o.toLowerCase();for(var t in e.stringParsers)if(e.stringParsers.hasOwnProperty(t)){var r=e.stringParsers[t],n=r.re.exec(o),i=n&&r.parse(n);if(i)return this.value=this.RGBtoHSB.apply(null,i),!1}},setHue:function(e){this.value.h=1-e},setSaturation:function(e){this.value.s=e},setLightness:function(e){this.value.b=1-e},setAlpha:function(e){this.value.a=parseInt(100*(1-e),10)/100},toRGB:function(e,o,t,r){e||(e=this.value.h,o=this.value.s,t=this.value.b),e*=360;var n,i,l,c,s;return e=e%360/60,s=t*o,c=s*(1-Math.abs(e%2-1)),n=i=l=t-s,e=~~e,n+=[s,c,0,0,c,s][e],i+=[c,s,s,c,0,0][e],l+=[0,0,c,s,s,c][e],{r:Math.round(255*n),g:Math.round(255*i),b:Math.round(255*l),a:r||this.value.a}},toHex:function(e,o,t,r){var n=this.toRGB(e,o,t,r);return"#"+(1<<24|parseInt(n.r,10)<<16|parseInt(n.g,10)<<8|parseInt(n.b,10)).toString(16).substr(1)}}}]).factory("Slider",["Helper",function(e){"use strict";var o={maxLeft:0,maxTop:0,callLeft:null,callTop:null,knob:{top:0,left:0}},t={};return{getSlider:function(){return o},getLeftPosition:function(e){return Math.max(0,Math.min(o.maxLeft,o.left+((e.pageX||t.left)-t.left)))},getTopPosition:function(e){return Math.max(0,Math.min(o.maxTop,o.top+((e.pageY||t.top)-t.top)))},setSlider:function(r,n){var i=e.closestSlider(r.target),l=e.getOffset(i,n),c=i.getBoundingClientRect(),s=r.clientX-c.left,a=r.clientY-c.top;o.knob=i.children[0].style,o.left=r.pageX-l.left-window.pageXOffset+l.scrollX,o.top=r.pageY-l.top-window.pageYOffset+l.scrollY,t={left:r.pageX-(s-o.left),top:r.pageY-(a-o.top)}},setSaturation:function(e,t){o={maxLeft:100,maxTop:100,callLeft:"setSaturation",callTop:"setLightness"},this.setSlider(e,t)},setHue:function(e,t){o={maxLeft:0,maxTop:100,callLeft:!1,callTop:"setHue"},this.setSlider(e,t)},setAlpha:function(e,t){o={maxLeft:0,maxTop:100,callLeft:!1,callTop:"setAlpha"},this.setSlider(e,t)},setKnob:function(e,t){o.knob.top=e+"px",o.knob.left=t+"px"}}}]).directive("colorpicker",["$document","$compile","Color","Slider","Helper",function(e,o,t,r,n){"use strict";return{require:"?ngModel",restrict:"A",link:function(i,l,c,s){var a,u=c.colorpicker?c.colorpicker:"hex",p=angular.isDefined(c.colorpickerPosition)?c.colorpickerPosition:"bottom",f=angular.isDefined(c.colorpickerInline)?c.colorpickerInline:!1,d=angular.isDefined(c.colorpickerFixedPosition)?c.colorpickerFixedPosition:!1,h=angular.isDefined(c.colorpickerParent)?l.parent():angular.element(document.body),k=angular.isDefined(c.colorpickerWithInput)?c.colorpickerWithInput:!1,g=k?'<input type="text" name="colorpicker-input">':"",v=f?"":'<button type="button" class="close close-colorpicker">&times;</button>',m='<div class="colorpicker dropdown"><div class="dropdown-menu"><colorpicker-saturation><i></i></colorpicker-saturation><colorpicker-hue><i></i></colorpicker-hue><colorpicker-alpha><i></i></colorpicker-alpha><colorpicker-preview></colorpicker-preview>'+g+v+"</div></div>",b=angular.element(m),x=t,w=b.find("colorpicker-hue"),S=b.find("colorpicker-saturation"),I=b.find("colorpicker-preview"),L=b.find("i");if(o(b)(i),k){var C=b.find("input");C.on("mousedown",function(e){e.stopPropagation()}).on("keyup",function(e){var o=this.value;l.val(o),s&&i.$apply(s.$setViewValue(o)),e.stopPropagation(),e.preventDefault()}),l.on("keyup",function(){C.val(l.val())})}var P=function(){e.on("mousemove",T),e.on("mouseup",H)};"rgba"===u&&(b.addClass("alpha"),a=b.find("colorpicker-alpha"),a.on("click",function(e){r.setAlpha(e,d),T(e)}).on("mousedown",function(e){r.setAlpha(e,d),P()}).on("mouseup",function(e){B("colorpicker-selected-alpha")})),w.on("click",function(e){r.setHue(e,d),T(e)}).on("mousedown",function(e){r.setHue(e,d),P()}).on("mouseup",function(e){B("colorpicker-selected-hue")}),S.on("click",function(e){r.setSaturation(e,d),T(e),angular.isDefined(c.colorpickerCloseOnSelect)&&D()}).on("mousedown",function(e){r.setSaturation(e,d),P()}).on("mouseup",function(e){B("colorpicker-selected-saturation")}),d&&b.addClass("colorpicker-fixed-position"),b.addClass("colorpicker-position-"+p),"true"===f&&b.addClass("colorpicker-inline"),h.append(b),s&&(s.$render=function(){l.val(s.$viewValue)},i.$watch(c.ngModel,function(e){M(),k&&C.val(e)})),l.on("$destroy",function(){b.remove()});var $=function(){try{I.css("backgroundColor",x[u]())}catch(e){I.css("backgroundColor",x.toHex())}S.css("backgroundColor",x.toHex(x.value.h,1,1,1)),"rgba"===u&&(a.css.backgroundColor=x.toHex())},T=function(e){var o=r.getLeftPosition(e),t=r.getTopPosition(e),n=r.getSlider();r.setKnob(t,o),n.callLeft&&x[n.callLeft].call(x,o/100),n.callTop&&x[n.callTop].call(x,t/100),$();var c=x[u]();return l.val(c),s&&i.$apply(s.$setViewValue(c)),k&&C.val(c),!1},H=function(){B("colorpicker-selected"),e.off("mousemove",T),e.off("mouseup",H)},M=function(){x.setColor(l.val()),L.eq(0).css({left:100*x.value.s+"px",top:100-100*x.value.b+"px"}),L.eq(1).css("top",100*(1-x.value.h)+"px"),L.eq(2).css("top",100*(1-x.value.a)+"px"),$()},y=function(){var e,o=n.getOffset(l[0]);return angular.isDefined(c.colorpickerParent)&&(o.left=0,o.top=0),"top"===p?e={top:o.top-147,left:o.left}:"right"===p?e={top:o.top,left:o.left+126}:"bottom"===p?e={top:o.top+l[0].offsetHeight+2,left:o.left}:"left"===p&&(e={top:o.top,left:o.left-150}),{top:e.top+"px",left:e.left+"px"}},O=function(){D()},A=function(){b.hasClass("colorpicker-visible")||(M(),b.addClass("colorpicker-visible").css(y()),B("colorpicker-shown"),f===!1&&e.on("mousedown",O),c.colorpickerIsOpen&&(i[c.colorpickerIsOpen]=!0,i.$$phase||i.$digest()))};f===!1?l.on("click",A):A(),b.on("mousedown",function(e){e.stopPropagation(),e.preventDefault()});var B=function(e){s&&i.$emit(e,{name:c.ngModel,value:s.$modelValue})},D=function(){b.hasClass("colorpicker-visible")&&(b.removeClass("colorpicker-visible"),B("colorpicker-closed"),e.off("mousedown",O),c.colorpickerIsOpen&&(i[c.colorpickerIsOpen]=!1,i.$$phase||i.$digest()))};b.find("button").on("click",function(){D()}),c.colorpickerIsOpen&&i.$watch(c.colorpickerIsOpen,function(e){e===!0?A():e===!1&&D()})}}}]);
 //! moment.js
 //! version : 2.10.6
 //! authors : Tim Wood, Iskren Chernev, Moment.js contributors

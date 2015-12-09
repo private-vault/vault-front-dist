@@ -416,7 +416,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
 
     /*
      * AngularJS Toaster
-     * Version: 0.4.16
+     * Version: 0.4.18
      *
      * Copyright 2013-2015 Jiri Kavulak.
      * All Rights Reserved.
@@ -441,6 +441,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
              'close-button': { 'toast-error': true, 'toast-info': false }
              */
             'close-button': false,
+            'close-html': '<button class="toast-close-button" type="button">&times;</button>',
             'newest-on-top': true, 
             //'fade-in': 1000,            // done in css
             //'on-fade-in': undefined,    // not implemented
@@ -470,7 +471,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
         ).service(
         'toaster', [
             '$rootScope', 'toasterConfig', function ($rootScope, toasterConfig) {
-                this.pop = function (type, title, body, timeout, bodyOutputType, clickHandler, toasterId, showCloseButton, toastId, onHideCallback, directiveData) {
+                this.pop = function (type, title, body, timeout, bodyOutputType, clickHandler, toasterId, showCloseButton, toastId, onHideCallback) {
                     if (angular.isObject(type)) {
                         var params = type; // Enable named parameters as pop argument
                         this.toast = {
@@ -481,6 +482,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                             bodyOutputType: params.bodyOutputType,
                             clickHandler: params.clickHandler,
                             showCloseButton: params.showCloseButton,
+                            closeHtml: params.closeHtml,
                             uid: params.toastId,
                             onHideCallback: params.onHideCallback,
                             directiveData: params.directiveData
@@ -497,8 +499,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                             clickHandler: clickHandler,
                             showCloseButton: showCloseButton,
                             uid: toastId,
-                            onHideCallback: onHideCallback,
-                            directiveData: directiveData
+                            onHideCallback: onHideCallback
                         };
                     }
                     $rootScope.$emit('toaster-newToast', toasterId, toastId);
@@ -514,7 +515,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                 }
 
                 function createTypeMethod(toasterType) {
-                    return function (title, body, timeout, bodyOutputType, clickHandler, toasterId, showCloseButton, toastId, onHideCallback, directiveData) {
+                    return function (title, body, timeout, bodyOutputType, clickHandler, toasterId, showCloseButton, toastId, onHideCallback) {
                         if (angular.isString(title)) {
                             this.pop(
                                 toasterType,
@@ -526,9 +527,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                 toasterId,
                                 showCloseButton,
                                 toastId,
-                                onHideCallback,
-                                directiveData
-                                );
+                                onHideCallback);
                         } else { // 'title' is actually an object with options
                             this.pop(angular.extend(title, { type: toasterType }));
                         }
@@ -548,8 +547,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                     for (var i = 0, len = newToastEventSubscribers.length; i < len; i++) {
                                         newToastEventSubscribers[i](event, toasterId, toastId);
                                     }
-                                }
-                                );
+                                });
                         }
 
                         if (!deregisterClearToasts) {
@@ -558,8 +556,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                     for (var i = 0, len = clearToastsEventSubscribers.length; i < len; i++) {
                                         clearToastsEventSubscribers[i](event, toasterId, toastId);
                                     }
-                                }
-                                );
+                                });
                         }
                     },
 
@@ -650,6 +647,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                             message: mergedConfig['message-class'],
                             tap: mergedConfig['tap-to-dismiss'],
                             closeButton: mergedConfig['close-button'],
+                            closeHtml: mergedConfig['close-html'],
                             animation: mergedConfig['animation-class'],
                             mouseoverTimer: mergedConfig['mouseover-timer-stop']
                         };
@@ -729,7 +727,11 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                                 // if an option was not set, default to false.
                                 toast.showCloseButton = false;
                             }
-
+                            
+                            if (toast.showCloseButton) {
+                                toast.closeHtml = $sce.trustAsHtml(toast.closeHtml || scope.config.closeHtml);
+                            }
+                             
                             // Set the toast.bodyOutputType to the default if it isn't set
                             toast.bodyOutputType = toast.bodyOutputType || mergedConfig['body-output-type'];
                             switch (toast.bodyOutputType) {
@@ -751,6 +753,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                             }
 
                             scope.configureTimer(toast);
+                            
                             if (mergedConfig['newest-on-top'] === true) {
                                 scope.toasters.unshift(toast);
                                 if (mergedConfig['limit'] > 0 && scope.toasters.length > mergedConfig['limit']) {
@@ -871,7 +874,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.transition","ui.bootstrap.collapse"
                     template: 
                         '<div id="toast-container" ng-class="[config.position, config.animation]">' + 
                             '<div ng-repeat="toaster in toasters" class="toast" ng-class="toaster.type" ng-click="click(toaster)" ng-mouseover="stopTimer(toaster)" ng-mouseout="restartTimer(toaster)">' + 
-                                '<button type="button" class="toast-close-button" ng-show="toaster.showCloseButton" ng-click="click(toaster, true)">&times;</button>' + 
+                                '<div ng-if="toaster.showCloseButton" ng-click="click(toaster, true)" ng-bind-html="toaster.closeHtml"></div>' + 
                                 '<div ng-class="config.title">{{toaster.title}}</div>' + 
                                 '<div ng-class="config.message" ng-switch on="toaster.bodyOutputType">' + 
                                     '<div ng-switch-when="trustedHtml" ng-bind-html="toaster.html"></div>' + 

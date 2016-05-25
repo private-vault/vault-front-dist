@@ -345,3 +345,7 @@ body {
   transition: opacity .3s ease;
   transform: none;
 }
+.copyable {
+  border-bottom: 1px dotted #9D516D;
+  cursor: pointer;
+}
